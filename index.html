@@ -1,0 +1,484 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jimi DVR Recording Calculator</title>
+    <!-- Note: For production, install TailwindCSS properly. Using CDN for development/demo purposes -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Jimi IoT Color Customization */
+        .bg-jimi-primary { background-color: #0066CC; }
+        .bg-jimi-secondary { background-color: #0052A3; }
+        .hover\:bg-jimi-primary:hover { background-color: #0052A3; }
+        .text-jimi-primary { color: #0066CC; }
+        .border-jimi-primary { border-color: #0066CC; }
+    </style>
+</head>
+<body class="bg-gray-50 transition-colors duration-300">
+    <!-- Header -->
+    <header class="text-white shadow-lg" style="background: linear-gradient(90deg, #0066CC 0%, #0052A3 100%);">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex items-center space-x-4">
+                <i class="fas fa-video text-4xl"></i>
+                <div>
+                    <h1 class="text-3xl font-bold">Calculadora DVR Jimi IoT</h1>
+                    <p class="text-white opacity-90 text-sm">Calculadora de Tempo de Gravação e Consumo de Dados</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Model Selection -->
+        <section class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                Selecione o Modelo do Equipamento
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- JC181 Card -->
+                <div class="model-card bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all border-2 border-transparent hover:border-blue-500" data-model="JC181">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">JC181</h3>
+                        <i class="fas fa-camera text-3xl text-blue-500"></i>
+                    </div>
+                    <div class="text-sm text-gray-600 space-y-2">
+                        <p><i class="fas fa-sd-card text-blue-500"></i> Máx: 128 GB</p>
+                        <p><i class="fas fa-video text-blue-500"></i> Canais: 2 (CH1, CH2)</p>
+                        <p><i class="fas fa-film text-blue-500"></i> 480P / 720P / 1080P</p>
+                    </div>
+                </div>
+
+                <!-- JC371 Card -->
+                <div class="model-card bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all border-2 border-transparent hover:border-blue-500" data-model="JC371">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">JC371</h3>
+                        <i class="fas fa-camera text-3xl text-green-500"></i>
+                    </div>
+                    <div class="text-sm text-gray-600 space-y-2">
+                        <p><i class="fas fa-sd-card text-green-500"></i> Máx: 256 GB</p>
+                        <p><i class="fas fa-video text-green-500"></i> Canais: 3 (CH1-CH3)</p>
+                        <p><i class="fas fa-film text-green-500"></i> 360P - 1080P + H.265</p>
+                    </div>
+                </div>
+
+                <!-- JC400 Card -->
+                <div class="model-card bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all border-2 border-transparent hover:border-blue-500" data-model="JC400">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">JC400</h3>
+                        <i class="fas fa-camera text-3xl text-purple-500"></i>
+                    </div>
+                    <div class="text-sm text-gray-600 space-y-2">
+                        <p><i class="fas fa-sd-card text-purple-500"></i> Máx: 256 GB</p>
+                        <p><i class="fas fa-video text-purple-500"></i> Canais: 2 (IN, OUT)</p>
+                        <p><i class="fas fa-film text-purple-500"></i> 360P - 1080P</p>
+                    </div>
+                </div>
+
+                <!-- JC450 Card -->
+                <div class="model-card bg-white rounded-xl shadow-lg p-6 cursor-pointer hover:shadow-xl transition-all border-2 border-transparent hover:border-blue-500" data-model="JC450">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-bold text-gray-800">JC450</h3>
+                        <i class="fas fa-camera text-3xl text-red-500"></i>
+                    </div>
+                    <div class="text-sm text-gray-600 space-y-2">
+                        <p><i class="fas fa-sd-card text-red-500"></i> Máx: 2 x 256 GB</p>
+                        <p><i class="fas fa-video text-red-500"></i> Canais: 5 (CH1-CH5)</p>
+                        <p><i class="fas fa-film text-red-500"></i> 480P / 720P / 1080P</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration Section -->
+        <section id="configSection" class="mb-8 hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+                    Configuração de Gravação
+                </h2>
+                
+                <!-- Preset Selection -->
+                <div id="presetSection" class="mb-6 hidden">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3">
+                        <i class="fas fa-magic text-purple-500"></i> 
+                        Perfis Pré-Configurados
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="presetsContainer">
+                    </div>
+                    <div class="mt-4 text-center">
+                        <button id="customConfigBtn" class="text-blue-600 hover:underline">
+                            <i class="fas fa-sliders-h mr-2"></i>
+                            Ou configure manualmente
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="manualConfigSection">
+                    <!-- Left Column -->
+                    <div class="space-y-4">
+                        <!-- Card Size -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-sd-card text-blue-500"></i> 
+                                <span id="cardSizeLabel">Tamanho do Cartão SD</span>
+                                <span class="tooltip-icon" data-tooltip="Capacidade total do cartão de memória. O espaço útil é de 90% do total.">
+                                    <i class="fas fa-info-circle text-gray-400 ml-1"></i>
+                                </span>
+                            </label>
+                            
+                            <!-- JC450 Card Count Selector -->
+                            <div id="cardCountSelector" class="mb-3 hidden">
+                                <label class="block text-xs text-gray-600 mb-2">
+                                    <i class="fas fa-layer-group text-blue-500 mr-1"></i>
+                                    Quantidade de Cartões SD
+                                </label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button type="button" id="oneCardBtn" class="card-count-btn px-3 py-2 border-2 rounded-lg text-sm font-semibold transition-all">
+                                        1 Cartão
+                                    </button>
+                                    <button type="button" id="twoCardsBtn" class="card-count-btn active px-3 py-2 border-2 rounded-lg text-sm font-semibold transition-all">
+                                        2 Cartões
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <select id="cardSize" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500">
+                            </select>
+                            <p id="cardSizeHint" class="text-xs text-gray-500 mt-1 hidden"></p>
+                        </div>
+
+                        <!-- Calculation Mode Selection -->
+                        <div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                            <h3 class="text-base font-bold text-gray-800 mb-3 flex items-center">
+                                <i class="fas fa-sliders-h text-blue-600 mr-2"></i>
+                                Escolha o Modo de Cálculo
+                            </h3>
+                            
+                            <!-- Mode Toggle Buttons -->
+                            <div class="grid grid-cols-2 gap-3 mb-4">
+                                <button id="manualModeBtn" class="mode-btn active px-4 py-3 rounded-lg font-semibold transition-all flex flex-col items-center border-2">
+                                    <i class="fas fa-sliders text-2xl mb-2"></i>
+                                    <span class="text-sm">Configurar Manualmente</span>
+                                </button>
+                                <button id="autoModeBtn" class="mode-btn px-4 py-3 rounded-lg font-semibold transition-all flex flex-col items-center border-2">
+                                    <i class="fas fa-wand-magic-sparkles text-2xl mb-2"></i>
+                                    <span class="text-sm">Tempo Desejado</span>
+                                </button>
+                            </div>
+
+                            <!-- Auto Mode Panel -->
+                            <div id="autoModePanel" class="hidden">
+                                <div class="p-4 bg-white rounded-lg border-2 border-indigo-300 shadow-sm">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-3">
+                                        <i class="fas fa-clock text-indigo-600 mr-2"></i>
+                                        Tempo de Gravação Desejado
+                                    </label>
+                                    <div class="grid grid-cols-2 gap-4 mb-3">
+                                        <div>
+                                            <label class="block text-xs text-gray-600 mb-1 font-medium">
+                                                Dias
+                                            </label>
+                                            <input type="number" id="desiredDays" min="0" step="1" value="1" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xl font-bold text-center">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs text-gray-600 mb-1 font-medium">
+                                                Horas
+                                            </label>
+                                            <input type="number" id="desiredHours" min="0" max="23" step="1" value="0" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-xl font-bold text-center">
+                                        </div>
+                                    </div>
+                                    <div class="p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg text-center border-2 border-indigo-200">
+                                        <span class="text-sm text-gray-700">
+                                            <i class="fas fa-calculator text-indigo-600 mr-1"></i>
+                                            <strong>Total:</strong> 
+                                            <span id="totalDesiredTime" class="font-bold text-indigo-700 text-lg">24 horas</span>
+                                        </span>
+                                    </div>
+                                    
+                                    <!-- Channel Priority Selection -->
+                                    <div id="channelPriorityDiv" class="mt-4 hidden">
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                            <i class="fas fa-star text-yellow-500 mr-2"></i>
+                                            Prioridade de Qualidade
+                                        </label>
+                                        <select id="channelPriority" class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium">
+                                            <option value="equal">🎥 Todas as câmeras com mesma qualidade</option>
+                                        </select>
+                                        <p class="text-xs text-gray-500 mt-2 italic">
+                                            <i class="fas fa-info-circle mr-1"></i>
+                                            Escolha qual canal terá prioridade de imagem ou se todos terão a mesma configuração
+                                        </p>
+                                    </div>
+                                    
+                                    <button id="generateConfigBtn" class="w-full mt-4 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg" style="background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);">
+                                        <i class="fas fa-magic mr-2"></i>
+                                        Gerar Configurações Automáticas
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Manual Configuration Section -->
+                        <div id="manualConfigPanel">
+                        <!-- Number of Channels -->
+                        <div id="channelCountDiv">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-video text-blue-500"></i> 
+                                Número de Canais Ativos
+                            </label>
+                            <input type="number" id="channelCount" min="1" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column - Channel Configuration -->
+                    <div id="channelConfig" class="space-y-4">
+                    </div>
+                </div>
+
+                <!-- Calculate Button (initially hidden) -->
+                <div id="calculateButtonSection" class="mt-6 flex space-x-4 hidden">
+                    <button id="calculateBtn" class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl">
+                        <i class="fas fa-calculator mr-2"></i>
+                        Calcular
+                    </button>
+                    <button id="resetBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all">
+                        <i class="fas fa-redo mr-2"></i>
+                        Limpar
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="resultsSection" class="mb-8 hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        Resultados
+                    </h2>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-1 gap-4 mb-6">
+                    <!-- Tempo Total Card -->
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-8 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex-1">
+                                <span class="text-lg opacity-90 block mb-3">Tempo Total de Gravação</span>
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div class="text-center p-4 bg-white bg-opacity-20 rounded-lg">
+                                        <div class="text-4xl font-bold mb-1" id="totalTimeDays">-</div>
+                                        <div class="text-sm opacity-90">Dias</div>
+                                    </div>
+                                    <div class="text-center p-4 bg-white bg-opacity-20 rounded-lg">
+                                        <div class="text-4xl font-bold mb-1" id="totalTimeHours">-</div>
+                                        <div class="text-sm opacity-90">Horas</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <i class="fas fa-clock text-6xl opacity-30 ml-6"></i>
+                        </div>
+                        <div class="mt-4 pt-4 border-t border-white border-opacity-30">
+                            <div class="flex items-start text-sm opacity-95" id="ignitionNoteText">
+                                <i class="fas fa-info-circle mr-2 mt-1 flex-shrink-0"></i>
+                                <p>
+                                    <strong>Importante:</strong> Os dias indicados referem-se ao tempo contínuo com a ignição do veículo ligada. 
+                                    O tempo real pode variar conforme o padrão de uso do veículo.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Summary -->
+                <div class="mb-6 bg-gray-50 rounded-lg p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">
+                        <i class="fas fa-cog text-blue-500 mr-2"></i>
+                        Resumo da Configuração
+                    </h3>
+                    <div id="configSummary" class="space-y-3 text-gray-700">
+                        <!-- Será preenchido dinamicamente -->
+                    </div>
+                </div>
+
+                <!-- Command Display -->
+                <div id="commandSection" class="bg-gray-100 rounded-lg p-4">
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">
+                        Comando do Dispositivo
+                    </h3>
+                    <div id="commandDisplay" class="font-mono text-sm bg-gray-800 text-green-400 p-3 rounded overflow-x-auto">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Recommended Alternatives Section -->
+        <section id="recommendedSection" class="mb-8 hidden">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        <i class="fas fa-stars text-purple-500 mr-2"></i>
+                        Configurações Recomendadas
+                    </h2>
+                    <p class="text-sm text-gray-600 mt-2">
+                        Outras opções que também podem atender suas necessidades
+                    </p>
+                </div>
+                <div id="recommendedAlternatives" class="space-y-4">
+                    <!-- Será preenchido dinamicamente -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Reference Table -->
+        <section class="mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">
+                    Tabela de Referência
+                </h2>
+                <p class="text-sm text-gray-600 mb-4">
+                    Valores aproximados baseados no documento oficial da Jimi IoT (v1.1.5)
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-gray-700">Modelo</th>
+                                <th class="px-4 py-2 text-left text-gray-700">Configuração</th>
+                                <th class="px-4 py-2 text-left text-gray-700">Cartão</th>
+                                <th class="px-4 py-2 text-left text-gray-700">Tempo Est.</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 text-gray-800">
+                            <tr class="bg-blue-50/20"><td class="px-4 py-2 font-bold" colspan="4">JC181</td></tr>
+                            <tr><td class="px-4 py-2">JC181</td><td>720P@4M + 360P@0.5M (Padrão)</td><td>64GB</td><td>~29.1h</td></tr>
+                            <tr><td class="px-4 py-2">JC181</td><td>720P@4M + 360P@0.5M (Padrão)</td><td>128GB</td><td>~58.3h</td></tr>
+                            <tr><td class="px-4 py-2">JC181</td><td>1080P@8M + 360P@0.5M</td><td>64GB</td><td>~15.4h</td></tr>
+                            <tr><td class="px-4 py-2">JC181</td><td>1080P@8M + 360P@0.5M</td><td>128GB</td><td>~30.8h</td></tr>
+                            <tr><td class="px-4 py-2">JC181</td><td>480P@1M + 360P@0.5M</td><td>64GB</td><td>~87.4h</td></tr>
+                            <tr><td class="px-4 py-2">JC181</td><td>480P@1M + 360P@0.5M</td><td>128GB</td><td>~174.8h</td></tr>
+                            
+                            <tr class="bg-green-50/20"><td class="px-4 py-2 font-bold" colspan="4">JC371</td></tr>
+                            <tr><td class="px-4 py-2">JC371</td><td>1080P@8M + 720P@4M×2 (3CH)</td><td>32GB</td><td>~4.1h</td></tr>
+                            <tr><td class="px-4 py-2">JC371</td><td>1080P@8M + 720P@4M×2 (3CH)</td><td>128GB</td><td>~16.4h</td></tr>
+                            <tr><td class="px-4 py-2">JC371</td><td>1080P@8M + 720P@4M×2 (3CH)</td><td>256GB</td><td>~32.8h</td></tr>
+                            <tr><td class="px-4 py-2">JC371</td><td>1080P@8M (3CH)</td><td>128GB</td><td>~10.9h</td></tr>
+                            <tr><td class="px-4 py-2">JC371</td><td>360P@0.5M (3CH)</td><td>128GB</td><td>~174.8h</td></tr>
+                            <tr><td class="px-4 py-2">JC371</td><td>360P@0.5M (3CH)</td><td>256GB</td><td>~349.5h</td></tr>
+                            
+                            <tr class="bg-purple-50/20"><td class="px-4 py-2 font-bold" colspan="4">JC400</td></tr>
+                            <tr><td class="px-4 py-2">JC400</td><td>1080P@8M + 720P@6M</td><td>32GB</td><td>~4.7h</td></tr>
+                            <tr><td class="px-4 py-2">JC400</td><td>1080P@8M + 720P@6M</td><td>128GB</td><td>~18.7h</td></tr>
+                            <tr><td class="px-4 py-2">JC400</td><td>1080P@8M + 720P@6M</td><td>256GB</td><td>~37.4h</td></tr>
+                            <tr><td class="px-4 py-2">JC400</td><td>360P@0.5M (2CH)</td><td>128GB</td><td>~262.1h</td></tr>
+                            
+                            <tr class="bg-red-50/20"><td class="px-4 py-2 font-bold" colspan="4">JC450</td></tr>
+                            <tr><td class="px-4 py-2">JC450</td><td>720P@2M + 480P@1M×4 (5CH)</td><td>128GB</td><td>~43.7h</td></tr>
+                            <tr><td class="px-4 py-2">JC450</td><td>720P@2M + 480P@1M×4 (5CH)</td><td>256GB</td><td>~87.4h</td></tr>
+                            <tr><td class="px-4 py-2">JC450</td><td>1080P@4M + 720P@2M×4 (5CH)</td><td>128GB</td><td>~21.8h</td></tr>
+                            <tr><td class="px-4 py-2">JC450</td><td>480P@1M (5CH)</td><td>128GB</td><td>~52.4h</td></tr>
+                            <tr><td class="px-4 py-2">JC450</td><td>480P@1M (5CH)</td><td>256GB</td><td>~104.9h</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-sm">
+                <i class="fas fa-code"></i> Jimi IoT DVR Recording Calculator v1.0 | 
+                Baseado em "DVR Products Recording Time Estimation v1.1.5"
+            </p>
+            <p class="text-xs text-gray-400 mt-2">
+                © 2025 Jimi IoT Brasil | Todos os direitos reservados
+            </p>
+        </div>
+    </footer>
+
+    <!-- Warning Modal -->
+    <div id="warningModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" style="backdrop-filter: blur(4px);">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 transform transition-all scale-95 opacity-0" id="warningModalContent">
+            <div class="bg-gradient-to-r from-red-500 to-red-600 rounded-t-2xl p-6 text-white">
+                <div class="flex items-center">
+                    <div class="bg-white bg-opacity-20 rounded-full p-3 mr-4">
+                        <i class="fas fa-exclamation-triangle text-3xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl font-bold" id="warningModalTitle">Capacidade Insuficiente</h3>
+                        <p class="text-sm opacity-90 mt-1" id="warningModalSubtitle">Cartão SD não comporta o tempo desejado</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="space-y-4">
+                    <!-- Desired Time -->
+                    <div class="bg-gray-50 rounded-lg p-4 border-l-4 border-red-500">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-clock text-red-500 mr-2"></i>
+                            <span class="text-sm font-semibold text-gray-700">Tempo Desejado</span>
+                        </div>
+                        <p class="text-2xl font-bold text-gray-800" id="warningDesiredTime">168.0 horas</p>
+                        <p class="text-sm text-gray-600" id="warningDesiredDays">(7.0 dias)</p>
+                    </div>
+                    
+                    <!-- Current Card -->
+                    <div class="bg-gray-50 rounded-lg p-4 border-l-4 border-gray-400">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-sd-card text-gray-500 mr-2"></i>
+                            <span class="text-sm font-semibold text-gray-700">Cartão Atual</span>
+                        </div>
+                        <p class="text-2xl font-bold text-gray-800" id="warningCurrentCard">32 GB</p>
+                    </div>
+                    
+                    <!-- Maximum Possible -->
+                    <div class="bg-orange-50 rounded-lg p-4 border-l-4 border-orange-500">
+                        <div class="flex items-center mb-2">
+                            <i class="fas fa-chart-line text-orange-500 mr-2"></i>
+                            <span class="text-sm font-semibold text-gray-700">Máximo Possível (menor bitrate)</span>
+                        </div>
+                        <p class="text-2xl font-bold text-gray-800" id="warningMaxTime">46.5 horas</p>
+                        <p class="text-sm text-gray-600" id="warningMaxDays">(1.9 dias)</p>
+                    </div>
+                    
+                    <!-- Solution -->
+                    <div class="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
+                        <div class="flex items-start">
+                            <i class="fas fa-lightbulb text-green-600 text-xl mr-3 mt-1"></i>
+                            <div>
+                                <p class="font-bold text-green-800 mb-2">💡 Solução</p>
+                                <p class="text-sm text-green-700" id="warningSolution">
+                                    Use um cartão SD de 64GB ou maior para atingir o tempo desejado.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Buttons -->
+                <div class="mt-6 flex gap-3">
+                    <button id="warningModalClose" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md hover:shadow-lg">
+                        <i class="fas fa-times mr-2"></i>Fechar
+                    </button>
+                    <button id="warningModalChangeCard" class="flex-1 text-white font-semibold py-3 px-6 rounded-lg transition-all shadow-md hover:shadow-lg" style="background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);">
+                        <i class="fas fa-sd-card mr-2"></i>Alterar Cartão
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="models.js"></script>
+    <script src="calculator.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+

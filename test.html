@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DVR Calculator - Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .warning { color: orange; }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 DVR Calculator - Página de Teste</h1>
+    
+    <div class="test-section">
+        <h2>1. Verificação de Arquivos</h2>
+        <div id="filesCheck"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Estrutura dos Modelos</h2>
+        <div id="modelsCheck"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Teste de Cálculo</h2>
+        <div id="calculationCheck"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>4. Elementos DOM</h2>
+        <div id="domCheck"></div>
+    </div>
+    
+    <div class="test-section">
+        <a href="index.html" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
+            🚀 Ir para Aplicação Principal
+        </a>
+    </div>
+
+    <script src="translations.js"></script>
+    <script src="models.js"></script>
+    <script src="calculator.js"></script>
+
+    <script>
+        // Test 1: Files loaded
+        const filesCheck = document.getElementById('filesCheck');
+        let allLoaded = true;
+        
+        if (typeof translations !== 'undefined') {
+            filesCheck.innerHTML += '<p class="success">✅ translations.js carregado</p>';
+        } else {
+            filesCheck.innerHTML += '<p class="error">❌ translations.js não carregado</p>';
+            allLoaded = false;
+        }
+        
+        if (typeof dvrModels !== 'undefined') {
+            filesCheck.innerHTML += '<p class="success">✅ models.js carregado</p>';
+        } else {
+            filesCheck.innerHTML += '<p class="error">❌ models.js não carregado</p>';
+            allLoaded = false;
+        }
+        
+        if (typeof DVRCalculator !== 'undefined') {
+            filesCheck.innerHTML += '<p class="success">✅ calculator.js carregado</p>';
+        } else {
+            filesCheck.innerHTML += '<p class="error">❌ calculator.js não carregado</p>';
+            allLoaded = false;
+        }
+        
+        // Test 2: Model structure
+        const modelsCheck = document.getElementById('modelsCheck');
+        const models = ['JC181', 'JC371', 'JC400', 'JC450'];
+        
+        models.forEach(modelName => {
+            if (dvrModels && dvrModels[modelName]) {
+                const model = dvrModels[modelName];
+                modelsCheck.innerHTML += `<p class="success">✅ ${modelName}</p>`;
+                modelsCheck.innerHTML += `<pre>  Canais: ${model.channels ? model.channels.length : model.maxChannels}
+  Presets: ${model.presets ? model.presets.length : 0}
+  Max Capacity: ${model.maxCapacity} GB</pre>`;
+                
+                // Check channel structure
+                if (model.channels && model.channels[0]) {
+                    const ch = model.channels[0];
+                    if (ch.resolutions && ch.resolutions[0] && ch.resolutions[0].bitrates) {
+                        modelsCheck.innerHTML += `<p class="success">  ✅ Estrutura de canal válida</p>`;
+                    } else if (ch.presets) {
+                        modelsCheck.innerHTML += `<p class="success">  ✅ Canal com presets</p>`;
+                    } else {
+                        modelsCheck.innerHTML += `<p class="warning">  ⚠️ Estrutura de canal pode ter problemas</p>`;
+                    }
+                }
+            } else {
+                modelsCheck.innerHTML += `<p class="error">❌ ${modelName} não encontrado</p>`;
+            }
+        });
+        
+        // Test 3: Calculation
+        const calculationCheck = document.getElementById('calculationCheck');
+        try {
+            const calc = new DVRCalculator();
+            const channels = [
+                { active: true, channelId: 'CH1', bitrate: 4, resolution: '720', fps: 25, codec: 'H.264' },
+                { active: true, channelId: 'CH2', bitrate: 0.5, resolution: '360', fps: 25, codec: 'H.264' }
+            ];
+            const result = calc.calculateTotal(64, channels);
+            
+            calculationCheck.innerHTML += '<p class="success">✅ Calculadora funcionando</p>';
+            calculationCheck.innerHTML += `<pre>Teste: 64GB, CH1:4Mbps + CH2:0.5Mbps
+Tempo calculado: ${calc.formatTime(result.totalTimeHours)}
+Esperado: ~29h
+Status: ${Math.abs(result.totalTimeHours - 29.1) < 1 ? '✅ OK' : '⚠️ Diferença detectada'}</pre>`;
+        } catch (e) {
+            calculationCheck.innerHTML += `<p class="error">❌ Erro no cálculo: ${e.message}</p>`;
+        }
+        
+        // Test 4: DOM elements (mock - would need full page)
+        const domCheck = document.getElementById('domCheck');
+        domCheck.innerHTML = '<p class="warning">⚠️ Execute na página principal para verificar elementos DOM</p>';
+        
+        console.log('=== Testes Completos ===');
+        console.log('Arquivo de teste carregado. Verifique os resultados acima.');
+    </script>
+</body>
+</html>
