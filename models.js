@@ -73,13 +73,20 @@ const dvrModels = {
         maxChannels: 2,
         commandFormat: (config) => {
             const commands = [];
-            // CH1 é configurável
+            // JC181: VIDEO,PARAM,<A>,<B>,<C>,<D>#
+            // A=1 (Main camera - CH1)
+            // B=480/720/1080 (Resolution)
+            // C=30/25/15 (FPS)
+            // D=1/2/3/4/5/6/7/8 (Bitrate in Mbps)
+            
             const ch1 = config.channels[0];
             if (ch1 && ch1.active) {
                 commands.push(`VIDEO,PARAM,1,${ch1.resolution},${ch1.fps},${ch1.bitrate}#`);
             }
-            // CH2 é sempre fixo: 360P@0.5M
-            commands.push('# CH2 is fixed: 360P (640×360) @ 0.5M');
+            
+            // CH2 é sempre fixo: 360P@0.5M@25fps (não precisa comando)
+            commands.push('# CH2 (Internal Camera) is fixed: 360P (640×360) @ 0.5M @ 25fps');
+            
             return commands.join('\n');
         }
     },
@@ -165,12 +172,22 @@ const dvrModels = {
         maxChannels: 3,
         commandFormat: (config) => {
             const commands = [];
+            // JC371: VIDEORSL,P1,P2,P3,P4,P5#
+            // Configura resolução, taxa de quadros, bitrate e codificação dos vídeos salvos no cartão SD
+            // Só entra em vigor após reiniciar o dispositivo
+            // P1 = Canal da câmera (1: CH1 / 2: CH2 / 3: CH3)
+            // P2 = Resolução (CH1: 1080/720/480/360, CH2: 1080/720/480/360, CH3: 720/480/360)
+            // P3 = Frame rate (5-25 fps) - Padrão: 25 (CH1), 15 (CH2/CH3)
+            // P4 = Bitrate (0.5-8 Mbps) - Padrão: 8 (CH1), 4 (CH2/CH3)
+            // P5 = Codec (1: H.264 / 2: H.265) - Padrão: 2 (H.265)
+            
             config.channels.forEach((ch, idx) => {
                 if (ch.active) {
-                    const codecValue = ch.codec === 'H264' ? 1 : 2;
-                    commands.push(`VIDEORSL_SUB,${idx + 1},${ch.resolution},${ch.fps},${ch.bitrate},${codecValue}#`);
+                    const codecValue = ch.codec === 'H265' || ch.codec === 'H.265' ? 2 : 1;
+                    commands.push(`VIDEORSL,${idx + 1},${ch.resolution},${ch.fps},${ch.bitrate},${codecValue}#`);
                 }
             });
+            
             return commands.join('\n');
         }
     },
@@ -232,11 +249,20 @@ const dvrModels = {
         maxChannels: 2,
         commandFormat: (config) => {
             const commands = [];
+            // JC400 uses preset mode with descriptive comments
+            // CAMERA,<channel>,<preset>#
+            // Presets define resolution, fps, and bitrate combinations
+            
             config.channels.forEach((ch) => {
-                if (ch.active) {
-                    commands.push(`CAMERA,${ch.channelId},${ch.preset}`);
+                if (!ch.active) return;
+                
+                if (ch.preset !== undefined) {
+                    // Add command with descriptive comment showing what the preset means
+                    const presetDesc = `${ch.resolution}P @ ${ch.fps}fps, ${ch.bitrate}Mbps`;
+                    commands.push(`CAMERA,${ch.channelId},${ch.preset}# // ${presetDesc}`);
                 }
             });
+            
             return commands.join('\n');
         }
     },
@@ -305,21 +331,32 @@ const dvrModels = {
             { id: 'CH5', name: 'CH5 - Camera 5 (PRO only)' }
         ],
         resolutions: [
-            { value: '480', label: '480P (720×480)', bitrates: [1] },
-            { value: '720', label: '720P (1280×720)', bitrates: [2] },
-            { value: '1080', label: '1080P (1920×1080)', bitrates: [3, 4] }
+            { value: '480', label: '480P (720×480)', bitrates: [1, 2, 3, 4] },
+            { value: '720', label: '720P (1280×720)', bitrates: [1, 2, 3, 4] },
+            { value: '1080', label: '1080P (1920×1080)', bitrates: [1, 2, 3, 4] }
         ],
         fps: [15, 25],
         maxChannels: 5,
         commandFormat: (config) => {
             const commands = [];
+            // JC450: VIDEORSL,<A>,<B>,<C>,<D>#
+            // A = número do canal (1-5)
+            // B = resolução (480/720/1080)
+            // C = frame rate (15/25)
+            // D = bitrate em Mbps (1, 2, 3, 4)
+            
             config.channels.forEach((ch, idx) => {
                 if (ch.active) {
-                    // Convert Mbps to Kbps for command (1024 Kbps = 1 Mbps)
-                    const bitrateKbps = ch.bitrate * 1024;
-                    commands.push(`VIDEORSL,${idx + 1},${ch.resolution},${ch.fps},${bitrateKbps}#`);
+                    // Extract channel number from channelId (e.g., "CH1" -> 1)
+                    const channelNum = ch.channelId ? parseInt(ch.channelId.replace(/[^0-9]/g, '')) : (idx + 1);
+                    
+                    // Bitrate in Mbps (not Kbps)
+                    const bitrateMbps = ch.bitrate;
+                    
+                    commands.push(`VIDEORSL,${channelNum},${ch.resolution},${ch.fps},${bitrateMbps}#`);
                 }
             });
+            
             return commands.join('\n');
         }
     }

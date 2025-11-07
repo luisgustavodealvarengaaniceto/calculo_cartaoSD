@@ -5,9 +5,19 @@ class DVRCalculator {
         this.config = {
             usableSpacePercent: 0.90,        // 90% of total capacity (editable)
             MB_PER_HOUR_PER_MBPS: 450,       // 1 Mbps = 450 MB/h (fixed formula)
-            MB_PER_GB: 1000,                 // Decimal (1000) or Binary (1024)
+            MB_PER_GB: 1024,                 // Binary (1024) by default to match Jimi PDFs
             defaultCodecMultiplier: 1.0,     // H.264 = 1.0, H.265 ≈ 0.6-0.8
-            useDecimalUnits: true            // true = GB (1000), false = GiB (1024)
+            useDecimalUnits: false,          // false = GiB (1024), true = GB (1000)
+            toleranceOK: 5,                  // Tolerance for OK status (%)
+            toleranceWarn: 15,               // Tolerance for WARN status (%)
+            
+            // 🔧 Realistic correction factors (based on real recordings)
+            useRealisticCorrections: true,   // Apply real-world overhead corrections
+            overheadTS: 0.03,                // +3% - TS container headers and indexes
+            overheadAudio: 0.01,             // +1% - Audio track (64-128 kbps)
+            overheadVBR: 0.02,               // +2% - Variable bitrate fluctuation (H.264)
+            overheadFilesystem: 0.02,        // +2% - Block slack space (32-64 KB blocks)
+            variationMargin: 0.10            // ±10% - Expected variation range
         };
     }
 
@@ -17,6 +27,123 @@ class DVRCalculator {
      */
     updateConfig(newConfig) {
         this.config = { ...this.config, ...newConfig };
+    }
+
+    /**
+     * Validate bitrate against device supported ranges
+     * @param {number} bitrate - Bitrate in Mbps
+     * @param {string} modelId - Model identifier (jc181, jc400, etc.)
+     * @param {string} resolution - Resolution (e.g., '1080', '720')
+     * @returns {object} - {valid: boolean, warning: string|null, range: array}
+     */
+    validateBitrate(bitrate, modelId, resolution) {
+        // Define supported bitrate ranges per model/resolution
+        const bitrateRanges = {
+            'jc181': {
+                '1080': { min: 1, max: 8 },
+                '720': { min: 1, max: 6 },
+                '480': { min: 1, max: 4 },
+                '360': { min: 0.5, max: 2 }
+            },
+            'jc400': {
+                '1080': { min: 4, max: 8 },
+                '720': { min: 2, max: 6 },
+                '480': { min: 1, max: 4 },
+                '360': { min: 0.5, max: 2 }
+            },
+            'jc371': {
+                '1080': { min: 2, max: 8 },
+                '720': { min: 1, max: 6 },
+                '480': { min: 0.5, max: 4 },
+                '360': { min: 0.5, max: 2 }
+            },
+            'jc450': {
+                '1080': { min: 512, max: 8192 }, // In Kbps (0.5-8 Mbps)
+                '720': { min: 512, max: 6144 },
+                '480': { min: 256, max: 4096 },
+                '360': { min: 256, max: 2048 }
+            }
+        };
+
+        const modelRanges = bitrateRanges[modelId];
+        if (!modelRanges) {
+            return { valid: true, warning: null, range: null };
+        }
+
+        const range = modelRanges[resolution];
+        if (!range) {
+            return { valid: true, warning: null, range: null };
+        }
+
+        // Convert JC450 Kbps to Mbps if needed
+        let min = range.min;
+        let max = range.max;
+        if (modelId === 'jc450' && max > 100) {
+            min = min / 1024;
+            max = max / 1024;
+        }
+
+        if (bitrate < min || bitrate > max) {
+            return {
+                valid: false,
+                warning: `⚠️ Bitrate ${bitrate} Mbps está fora do range suportado (${min}-${max} Mbps) — pode não ser aplicável no dispositivo.`,
+                range: { min, max }
+            };
+        }
+
+        return { valid: true, warning: null, range: { min, max } };
+    }
+
+    /**
+     * Calculate realistic correction factor based on codec and real-world overhead
+     * @param {string} codec - Codec name (H.264, H.265)
+     * @param {number} codecMultiplier - Base codec multiplier
+     * @returns {object} - {factor: number, breakdown: object}
+     */
+    getRealisticCorrectionFactor(codec = 'H.264', codecMultiplier = 1.0) {
+        if (!this.config.useRealisticCorrections) {
+            return { 
+                factor: codecMultiplier, 
+                breakdown: { base: codecMultiplier } 
+            };
+        }
+
+        const breakdown = {
+            base: codecMultiplier,
+            tsOverhead: this.config.overheadTS,
+            audio: this.config.overheadAudio,
+            vbr: codec === 'H.264' ? this.config.overheadVBR : 0,  // VBR mainly affects H.264
+            filesystem: this.config.overheadFilesystem
+        };
+
+        // For H.265, the codec multiplier already includes compression (~0.65)
+        // We add the overhead on top of that compression
+        let totalFactor;
+        if (codec === 'H.265' || codec === 'H265') {
+            // H.265: Start with compression benefit (0.65), then add overhead
+            totalFactor = codecMultiplier * (1 + breakdown.tsOverhead + breakdown.audio + breakdown.filesystem);
+        } else {
+            // H.264: Start at 1.0, add all overhead
+            totalFactor = codecMultiplier + breakdown.tsOverhead + breakdown.audio + breakdown.vbr + breakdown.filesystem;
+        }
+
+        breakdown.total = totalFactor;
+
+        return { factor: totalFactor, breakdown };
+    }
+
+    /**
+     * Calculate variation range (min/max time estimates)
+     * @param {number} baseTimeHours - Base calculation time in hours
+     * @returns {object} - {min: number, max: number, margin: number}
+     */
+    getVariationRange(baseTimeHours) {
+        const margin = baseTimeHours * this.config.variationMargin;
+        return {
+            min: baseTimeHours - margin,
+            max: baseTimeHours + margin,
+            margin: this.config.variationMargin * 100  // Convert to percentage
+        };
     }
 
     /**
@@ -148,11 +275,19 @@ class DVRCalculator {
         
         let totalRateMBh = 0;
         const channelResults = [];
+        const correctionFactors = []; // Track correction details
 
         channels.forEach((channel, index) => {
             if (channel.active) {
-                const codecMultiplier = channel.codecMultiplier || 1;
-                const effectiveBitrate = channel.bitrate * codecMultiplier;
+                const codec = channel.codec || 'H.264';
+                const baseCodecMultiplier = channel.codecMultiplier || 1;
+                
+                // Get realistic correction factor
+                const correction = this.getRealisticCorrectionFactor(codec, baseCodecMultiplier);
+                correctionFactors.push(correction);
+                
+                // Apply realistic correction factor
+                const effectiveBitrate = channel.bitrate * correction.factor;
                 const rateMBh = effectiveBitrate * this.config.MB_PER_HOUR_PER_MBPS;
                 const timeHours = availableSpaceMB / rateMBh;
                 
@@ -162,8 +297,10 @@ class DVRCalculator {
                     resolution: channel.resolution,
                     fps: channel.fps,
                     bitrate: channel.bitrate,
-                    codec: channel.codec || 'H.264',
-                    codecMultiplier: codecMultiplier,
+                    codec: codec,
+                    codecMultiplier: baseCodecMultiplier,
+                    correctionFactor: correction.factor,
+                    correctionBreakdown: correction.breakdown,
                     effectiveBitrate: effectiveBitrate,
                     timeHours: timeHours,
                     timeDays: timeHours / 24,
@@ -181,6 +318,9 @@ class DVRCalculator {
         const totalTimeHours = totalRateMBh > 0 ? availableSpaceMB / totalRateMBh : 0;
         const totalTimeDays = totalTimeHours / 24;
 
+        // Calculate variation range
+        const variationRange = this.getVariationRange(totalTimeHours);
+
         return {
             cardSizeGB,
             totalSpaceMB,
@@ -194,7 +334,17 @@ class DVRCalculator {
             totalRateMBs: totalRateMBh / 3600,
             channelResults,
             activeChannels: channelResults.length,
-            unitsUsed: this.config.useDecimalUnits ? 'GB (decimal)' : 'GiB (binary)'
+            unitsUsed: this.config.useDecimalUnits ? 'GB (decimal)' : 'GiB (binary)',
+            
+            // 🔧 Realistic calculation metadata
+            realisticCorrections: this.config.useRealisticCorrections,
+            variationRange: variationRange,
+            estimatedTimeRange: {
+                min: variationRange.min,
+                max: variationRange.max,
+                minDays: variationRange.min / 24,
+                maxDays: variationRange.max / 24
+            }
         };
     }
 
@@ -281,6 +431,223 @@ class DVRCalculator {
         }
         
         return { valid: true, warning: null };
+    }
+
+    /**
+     * JC450 DUAL CARD CALCULATION - Independent SD cards
+     * SD1: Channels 1, 2, 3
+     * SD2: Channels 4, 5
+     * Recording time = MIN(time_SD1, time_SD2)
+     * 
+     * @param {number} cardSizeGB - Size of EACH SD card in GB
+     * @param {Array} channels - Array of all 5 channels (indexed 0-4 for CH1-CH5)
+     * @param {boolean} useOneCard - If true, use single card mode (mirror/backup)
+     * @returns {object} - Detailed dual card calculation results
+     */
+    calculateJC450DualCard(cardSizeGB, channels, useOneCard = false) {
+        const MB_PER_GB = this.config.useDecimalUnits ? 1000 : 1024;
+        const MAX_TOTAL_BITRATE = 20; // 20 Mbps hardware limit
+        
+        console.log('[JC450 Debug] Input channels:', channels.length);
+        channels.forEach((ch, i) => {
+            console.log(`  Channel ${i}:`, ch.channelId, ch.channelName, 'Active:', ch.active, 'Bitrate:', ch.bitrate);
+        });
+        
+        // Separate channels by SD card based on channelId
+        // SD1: CH1, CH2, CH3 (channelId must contain '1', '2', or '3')
+        // SD2: CH4, CH5 (channelId must contain '4' or '5')
+        const sd1Channels = [];
+        const sd2Channels = [];
+        
+        channels.forEach((ch) => {
+            if (!ch.active) return;
+            
+            // Extract channel number from channelId (e.g., "CH1" -> 1)
+            const channelNum = parseInt(ch.channelId.replace(/[^0-9]/g, ''));
+            
+            if (channelNum >= 1 && channelNum <= 3) {
+                sd1Channels.push(ch);
+            } else if (channelNum >= 4 && channelNum <= 5) {
+                sd2Channels.push(ch);
+            }
+        });
+        
+        console.log('[JC450 Debug] SD1 channels:', sd1Channels.length, sd1Channels.map(c => c.channelId));
+        console.log('[JC450 Debug] SD2 channels:', sd2Channels.length, sd2Channels.map(c => c.channelId));
+        
+        // Calculate for SD1
+        const sd1Result = this.calculateCardWithChannels(cardSizeGB, sd1Channels, 'SD1', MB_PER_GB);
+        
+        // Calculate for SD2
+        const sd2Result = this.calculateCardWithChannels(cardSizeGB, sd2Channels, 'SD2', MB_PER_GB);
+        
+        console.log('[JC450 Debug]');
+        console.log('SD1: canais 1-3, bitrate', sd1Result.totalBitrate.toFixed(1), 'Mbps, tempo', sd1Result.timeHours.toFixed(1), 'h');
+        console.log('SD2: canais 4-5, bitrate', sd2Result.totalBitrate.toFixed(1), 'Mbps, tempo', sd2Result.timeHours.toFixed(1), 'h');
+        
+        // Total bitrate check
+        const totalBitrate = sd1Result.totalBitrate + sd2Result.totalBitrate;
+        const bitrateWarning = totalBitrate > MAX_TOTAL_BITRATE 
+            ? `⚠️ Bitrate total (${totalBitrate.toFixed(1)} Mbps) excede o limite de hardware (${MAX_TOTAL_BITRATE} Mbps). Reduza a qualidade.`
+            : null;
+        
+        // Recording time is limited by the card that fills first
+        // Handle cases where one card might have no active channels
+        const sd1Time = sd1Result.channelCount > 0 ? sd1Result.timeHours : Infinity;
+        const sd2Time = sd2Result.channelCount > 0 ? sd2Result.timeHours : Infinity;
+        
+        const limitingCard = sd1Time <= sd2Time ? 'SD1' : 'SD2';
+        const totalTimeHours = Math.min(sd1Time, sd2Time);
+        const totalTimeDays = isFinite(totalTimeHours) ? totalTimeHours / 24 : 0;
+        
+        console.log('Tempo total do sistema:', totalTimeHours.toFixed(1), 'h = min(', sd1Time.toFixed(1), ',', sd2Time.toFixed(1), ') - Limitado por:', limitingCard);
+        console.log('Bitrate total:', totalBitrate.toFixed(1), 'Mbps');
+        console.log('---');
+        
+        // Variation range
+        const variationRange = this.getVariationRange(totalTimeHours);
+        
+        // Combine all channel results for display
+        const allChannelResults = [...sd1Result.channelResults, ...sd2Result.channelResults];
+        
+        return {
+            // Card information
+            cardSizeGB,
+            useOneCard,
+            
+            // SD1 details
+            sd1: {
+                cardName: 'SD1',
+                channels: 'CH1, CH2, CH3',
+                channelCount: sd1Result.channelCount,
+                totalBitrate: sd1Result.totalBitrate,
+                totalRateMBh: sd1Result.totalRateMBh,
+                totalRateGBh: sd1Result.totalRateGBh,
+                availableSpaceMB: sd1Result.availableSpaceMB,
+                timeHours: sd1Result.timeHours,
+                timeDays: sd1Result.timeDays,
+                channelResults: sd1Result.channelResults
+            },
+            
+            // SD2 details
+            sd2: {
+                cardName: 'SD2',
+                channels: 'CH4, CH5',
+                channelCount: sd2Result.channelCount,
+                totalBitrate: sd2Result.totalBitrate,
+                totalRateMBh: sd2Result.totalRateMBh,
+                totalRateGBh: sd2Result.totalRateGBh,
+                availableSpaceMB: sd2Result.availableSpaceMB,
+                timeHours: sd2Result.timeHours,
+                timeDays: sd2Result.timeDays,
+                channelResults: sd2Result.channelResults
+            },
+            
+            // System totals
+            totalBitrate,
+            totalRateMBh: sd1Result.totalRateMBh + sd2Result.totalRateMBh,
+            totalRateGBh: sd1Result.totalRateGBh + sd2Result.totalRateGBh,
+            totalRateGBday: (sd1Result.totalRateGBh + sd2Result.totalRateGBh) * 24,
+            
+            // Recording time (limited by card that fills first)
+            totalTimeHours,
+            totalTimeDays,
+            limitingCard,
+            
+            // All channels combined
+            channelResults: allChannelResults,
+            activeChannels: allChannelResults.length,
+            
+            // Warnings and metadata
+            bitrateWarning,
+            usablePercentage: this.config.usableSpacePercent * 100,
+            realisticCorrections: this.config.useRealisticCorrections,
+            variationRange,
+            estimatedTimeRange: {
+                min: variationRange.min,
+                max: variationRange.max,
+                minDays: variationRange.min / 24,
+                maxDays: variationRange.max / 24
+            },
+            
+            note: `⚠️ O JC450 usa dois cartões SD independentes (SD1: CH1-3, SD2: CH4-5). ` +
+                  `O tempo total é limitado pelo cartão que enche primeiro (${limitingCard}). ` +
+                  `Pequenas variações (±${this.config.variationMargin * 100}%) podem ocorrer devido a bitrate variável, ` +
+                  `áudio, overhead do container TS e sistema de arquivos.`
+        };
+    }
+
+    /**
+     * Helper function to calculate a single card with assigned channels
+     * @param {number} cardSizeGB - Card size in GB
+     * @param {Array} channels - Channels assigned to this card
+     * @param {string} cardName - Name/ID of the card (SD1 or SD2)
+     * @param {number} MB_PER_GB - MB per GB conversion factor
+     * @returns {object} - Card calculation result
+     */
+    calculateCardWithChannels(cardSizeGB, channels, cardName, MB_PER_GB) {
+        const totalSpaceMB = cardSizeGB * MB_PER_GB;
+        const availableSpaceMB = totalSpaceMB * this.config.usableSpacePercent;
+        
+        console.log(`[${cardName}] Card size: ${cardSizeGB} GB, Available: ${availableSpaceMB.toFixed(0)} MB (${(this.config.usableSpacePercent * 100)}% usable)`);
+        
+        let totalRateMBh = 0;
+        const channelResults = [];
+        
+        channels.forEach(channel => {
+            const codec = channel.codec || 'H.264';
+            const baseCodecMultiplier = channel.codecMultiplier || 1;
+            
+            // Get realistic correction factor (1.08 for H.264)
+            const correction = this.getRealisticCorrectionFactor(codec, baseCodecMultiplier);
+            
+            // Apply correction
+            const effectiveBitrate = channel.bitrate * correction.factor;
+            const rateMBh = effectiveBitrate * this.config.MB_PER_HOUR_PER_MBPS;
+            
+            console.log(`[${cardName}] ${channel.channelId}: ${channel.bitrate.toFixed(2)} Mbps × ${correction.factor.toFixed(2)} = ${effectiveBitrate.toFixed(2)} Mbps → ${rateMBh.toFixed(1)} MB/h`);
+            
+            channelResults.push({
+                channelId: channel.channelId,
+                channelName: channel.channelName,
+                cardAssignment: cardName,
+                resolution: channel.resolution ? channel.resolution.toString() : '1080',
+                fps: channel.fps || 25,
+                bitrate: channel.bitrate || 1,
+                codec: codec,
+                codecMultiplier: baseCodecMultiplier,
+                correctionFactor: correction.factor,
+                correctionBreakdown: correction.breakdown,
+                effectiveBitrate: effectiveBitrate,
+                rateMBh: rateMBh,
+                rateGBh: rateMBh / MB_PER_GB,
+                rateGBday: (rateMBh * 24) / MB_PER_GB,
+                rateMBs: rateMBh / 3600
+            });
+            
+            totalRateMBh += rateMBh;
+        });
+        
+        // Calculate total bitrate in Mbps
+        const totalBitrate = channels.reduce((sum, ch) => sum + ch.bitrate, 0);
+        
+        // Calculate recording time for this card
+        const timeHours = totalRateMBh > 0 ? availableSpaceMB / totalRateMBh : Infinity;
+        const timeDays = isFinite(timeHours) ? timeHours / 24 : 0;
+        
+        console.log(`[${cardName}] Total consumption: ${totalRateMBh.toFixed(1)} MB/h → Time: ${timeHours.toFixed(1)} h (${timeDays.toFixed(2)} days)`);
+        
+        return {
+            cardName,
+            channelCount: channels.length,
+            totalBitrate,
+            totalRateMBh,
+            totalRateGBh: totalRateMBh / MB_PER_GB,
+            availableSpaceMB,
+            timeHours,
+            timeDays,
+            channelResults
+        };
     }
 
     /**
