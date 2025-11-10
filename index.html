@@ -16,6 +16,20 @@
         .hover\:bg-jimi-primary:hover { background-color: #0052A3; }
         .text-jimi-primary { color: #0066CC; }
         .border-jimi-primary { border-color: #0066CC; }
+        
+        /* Recommended card pulse animation */
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 10px 20px rgba(0, 102, 204, 0.2);
+            }
+            50% {
+                box-shadow: 0 12px 28px rgba(0, 102, 204, 0.35);
+            }
+        }
+        
+        .recommended-card {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-50 transition-colors duration-300">
@@ -100,22 +114,6 @@
                 <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
                     Configuração de Gravação
                 </h2>
-                
-                <!-- Preset Selection -->
-                <div id="presetSection" class="mb-6 hidden">
-                    <h3 class="text-lg font-semibold text-gray-700 mb-3">
-                        <i class="fas fa-magic text-purple-500"></i> 
-                        Perfis Pré-Configurados
-                    </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="presetsContainer">
-                    </div>
-                    <div class="mt-4 text-center">
-                        <button id="customConfigBtn" class="text-blue-600 hover:underline">
-                            <i class="fas fa-sliders-h mr-2"></i>
-                            Ou configure manualmente
-                        </button>
-                    </div>
-                </div>
                 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" id="manualConfigSection">
                     <!-- Left Column -->
@@ -348,15 +346,6 @@
                     </h3>
                     <div id="configSummary" class="space-y-3 text-gray-700">
                         <!-- Será preenchido dinamicamente -->
-                    </div>
-                </div>
-
-                <!-- Command Display -->
-                <div id="commandSection" class="bg-gray-100 rounded-lg p-4">
-                    <h3 class="text-lg font-bold text-gray-800 mb-2">
-                        Comando do Dispositivo
-                    </h3>
-                    <div id="commandDisplay" class="font-mono text-sm bg-gray-800 text-green-400 p-3 rounded overflow-x-auto">
                     </div>
                 </div>
             </div>

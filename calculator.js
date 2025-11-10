@@ -434,129 +434,196 @@ class DVRCalculator {
     }
 
     /**
-     * JC450 DUAL CARD CALCULATION - Independent SD cards
-     * SD1: Channels 1, 2, 3
-     * SD2: Channels 4, 5
-     * Recording time = MIN(time_SD1, time_SD2)
+     * JC450 DUAL CARD CALCULATION - According to Official Jimi IoT PDF V1.1.5
+     * 
+     * DUAL CARD MODE (Two-card):
+     * - Both cards record ALL channels (mirror/redundancy mode)
+     * - Total available space = 2 × cardSize × 0.9
+     * - Recording time = Total Space / Total Bitrate
+     * - Reference: 2×256GB, 12Mbps → 460.8GB / 12Mbps = 87.38h
+     * 
+     * SINGLE CARD MODE:
+     * - Only one card records all channels
+     * - Available space = 1 × cardSize × 0.9
      * 
      * @param {number} cardSizeGB - Size of EACH SD card in GB
      * @param {Array} channels - Array of all 5 channels (indexed 0-4 for CH1-CH5)
-     * @param {boolean} useOneCard - If true, use single card mode (mirror/backup)
-     * @returns {object} - Detailed dual card calculation results
+     * @param {boolean} useOneCard - If true, use single card mode
+     * @returns {object} - Detailed calculation results
      */
     calculateJC450DualCard(cardSizeGB, channels, useOneCard = false) {
         const MB_PER_GB = this.config.useDecimalUnits ? 1000 : 1024;
         const MAX_TOTAL_BITRATE = 20; // 20 Mbps hardware limit
         
+        console.log('[JC450 Debug] ========================================');
+        console.log('[JC450 Debug] Mode:', useOneCard ? 'SINGLE CARD' : 'DUAL CARD (Mirror/Redundancy)');
+        console.log('[JC450 Debug] Card size:', cardSizeGB, 'GB each');
         console.log('[JC450 Debug] Input channels:', channels.length);
+        console.log('[JC450 Debug] ========================================');
+        console.log('[JC450 Debug] CHANNEL BITRATES RECEIVED FROM UI:');
         channels.forEach((ch, i) => {
-            console.log(`  Channel ${i}:`, ch.channelId, ch.channelName, 'Active:', ch.active, 'Bitrate:', ch.bitrate);
+            console.log(`  ${ch.channelId} (${ch.channelName}): ${ch.bitrate} Mbps [Active: ${ch.active}]`);
         });
         
-        // Separate channels by SD card based on channelId
-        // SD1: CH1, CH2, CH3 (channelId must contain '1', '2', or '3')
-        // SD2: CH4, CH5 (channelId must contain '4' or '5')
-        const sd1Channels = [];
-        const sd2Channels = [];
+        // Filter active channels
+        const activeChannels = channels.filter(ch => ch.active);
         
-        channels.forEach((ch) => {
-            if (!ch.active) return;
-            
-            // Extract channel number from channelId (e.g., "CH1" -> 1)
-            const channelNum = parseInt(ch.channelId.replace(/[^0-9]/g, ''));
-            
-            if (channelNum >= 1 && channelNum <= 3) {
-                sd1Channels.push(ch);
-            } else if (channelNum >= 4 && channelNum <= 5) {
-                sd2Channels.push(ch);
-            }
+        console.log('[JC450 Debug] ========================================');
+        console.log('[JC450 Debug] ACTIVE CHANNELS BEING CALCULATED:');
+        activeChannels.forEach((ch, i) => {
+            console.log(`  [${i+1}] ${ch.channelId}: ${ch.bitrate} Mbps`);
         });
         
-        console.log('[JC450 Debug] SD1 channels:', sd1Channels.length, sd1Channels.map(c => c.channelId));
-        console.log('[JC450 Debug] SD2 channels:', sd2Channels.length, sd2Channels.map(c => c.channelId));
+        // FIXED: According to official documentation, in DUAL CARD mode,
+        // BOTH cards record ALL channels (mirror/redundancy), not split by channel.
+        // Total available space = 2 × cardSize × 0.9 (when using 2 cards)
         
-        // Calculate for SD1
-        const sd1Result = this.calculateCardWithChannels(cardSizeGB, sd1Channels, 'SD1', MB_PER_GB);
+        const numberOfCards = useOneCard ? 1 : 2;
+        const totalSpaceMB = cardSizeGB * numberOfCards * MB_PER_GB * this.config.usableSpacePercent;
         
-        // Calculate for SD2
-        const sd2Result = this.calculateCardWithChannels(cardSizeGB, sd2Channels, 'SD2', MB_PER_GB);
+        console.log('[JC450 Debug] Number of cards:', numberOfCards);
+        console.log('[JC450 Debug] Total available space:', totalSpaceMB.toFixed(0), 'MB =', (totalSpaceMB / MB_PER_GB).toFixed(2), 'GB');
         
-        console.log('[JC450 Debug]');
-        console.log('SD1: canais 1-3, bitrate', sd1Result.totalBitrate.toFixed(1), 'Mbps, tempo', sd1Result.timeHours.toFixed(1), 'h');
-        console.log('SD2: canais 4-5, bitrate', sd2Result.totalBitrate.toFixed(1), 'Mbps, tempo', sd2Result.timeHours.toFixed(1), 'h');
+        // Calculate total bitrate and channel results
+        let totalRateMBh = 0;
+        let totalNominalRateMBh = 0; // For theoretical calculation (without correction)
+        const channelResults = [];
         
-        // Total bitrate check
-        const totalBitrate = sd1Result.totalBitrate + sd2Result.totalBitrate;
+        activeChannels.forEach(channel => {
+            const codec = channel.codec || 'H.264';
+            const baseCodecMultiplier = channel.codecMultiplier || 1;
+            
+            // Get realistic correction factor (1.08 for H.264)
+            const correction = this.getRealisticCorrectionFactor(codec, baseCodecMultiplier);
+            
+            // Apply correction for display purposes
+            const effectiveBitrate = channel.bitrate * correction.factor;
+            const rateMBh = effectiveBitrate * this.config.MB_PER_HOUR_PER_MBPS;
+            
+            // Calculate nominal rate (without correction) for theoretical time calculation
+            const nominalRateMBh = channel.bitrate * this.config.MB_PER_HOUR_PER_MBPS;
+            
+            console.log(`[JC450] ${channel.channelId}: ${channel.bitrate.toFixed(2)} Mbps × ${correction.factor.toFixed(2)} = ${effectiveBitrate.toFixed(2)} Mbps → ${rateMBh.toFixed(1)} MB/h`);
+            
+            channelResults.push({
+                channelId: channel.channelId,
+                channelName: channel.channelName,
+                cardAssignment: useOneCard ? 'SD1' : 'SD1+SD2 (Mirror)',
+                resolution: channel.resolution ? channel.resolution.toString() : '1080',
+                fps: channel.fps || 25,
+                bitrate: channel.bitrate || 1,
+                codec: codec,
+                codecMultiplier: baseCodecMultiplier,
+                correctionFactor: correction.factor,
+                correctionBreakdown: correction.breakdown,
+                effectiveBitrate: effectiveBitrate,
+                rateMBh: rateMBh,
+                rateGBh: rateMBh / MB_PER_GB,
+                rateGBday: (rateMBh * 24) / MB_PER_GB,
+                rateMBs: rateMBh / 3600
+            });
+            
+            totalRateMBh += rateMBh;
+            totalNominalRateMBh += nominalRateMBh;
+        });
+        
+        // Calculate total bitrate in Mbps
+        const totalBitrate = activeChannels.reduce((sum, ch) => sum + ch.bitrate, 0);
+        const totalRateGBh = totalRateMBh / MB_PER_GB;
+        
+        console.log('[JC450 Debug] ========================================');
+        console.log('[JC450 Debug] BITRATE CALCULATION:');
+        console.log('[JC450 Debug] Sum formula: activeChannels.reduce((sum, ch) => sum + ch.bitrate, 0)');
+        console.log('[JC450 Debug] Individual bitrates:', activeChannels.map(ch => ch.bitrate).join(' + '));
+        console.log('[JC450 Debug] Total bitrate (nominal):', totalBitrate.toFixed(2), 'Mbps');
+        console.log('[JC450 Debug] ========================================');
+        
+        // FIXED: Calculate recording time using NOMINAL bitrate (without correction)
+        // This matches the official formula: recording_hours = (available_gb * 8192) / (total_bitrate_mbps * 3600)
+        // Equivalent to: recording_hours = available_MB / (total_bitrate_mbps * 450)
+        const timeHours = totalNominalRateMBh > 0 ? totalSpaceMB / totalNominalRateMBh : Infinity;
+        const timeDays = isFinite(timeHours) ? timeHours / 24 : 0;
+        
+        console.log('[JC450 Debug] ========================================');
+        console.log('[JC450 Debug] RECORDING TIME CALCULATION:');
+        console.log('[JC450 Debug] ========================================');
+        console.log('[JC450 Debug] Available space:', totalSpaceMB.toFixed(0), 'MB (', (totalSpaceMB / MB_PER_GB).toFixed(2), 'GB )');
+        console.log('[JC450 Debug] Total bitrate (sum):', totalBitrate.toFixed(2), 'Mbps');
+        console.log('[JC450 Debug] Theoretical consumption:', totalNominalRateMBh.toFixed(2), 'MB/h (', (totalNominalRateMBh / MB_PER_GB).toFixed(2), 'GB/h )');
+        console.log('[JC450 Debug] With overhead (8%):', totalRateMBh.toFixed(2), 'MB/h (', totalRateGBh.toFixed(2), 'GB/h )');
+        console.log('[JC450 Debug] ----------------------------------------');
+        console.log('[JC450 Debug] 📊 RECORDING TIME (theoretical):', timeHours.toFixed(2), 'hours =', timeDays.toFixed(2), 'days');
+        console.log('[JC450 Debug] ----------------------------------------');
+        console.log('[JC450 Debug] Formula verification:');
+        console.log('[JC450 Debug]   Method 1:', totalSpaceMB.toFixed(0), 'MB ÷', totalNominalRateMBh.toFixed(2), 'MB/h =', timeHours.toFixed(2), 'h');
+        console.log('[JC450 Debug]   Method 2: (', (totalSpaceMB / MB_PER_GB).toFixed(2), 'GB × 8192 ) ÷ (', totalBitrate.toFixed(2), 'Mbps × 3600 ) =', 
+            (((totalSpaceMB / MB_PER_GB) * 8192) / (totalBitrate * 3600)).toFixed(2), 'hours');
+        console.log('[JC450 Debug] ========================================');
+        console.log('[JC450 Debug] ✅ CALCULATION COMPLETE');
+        console.log('[JC450 Debug] 💡 To get different results, change the bitrate values in the UI dropdowns');
+        console.log('[JC450 Debug] 💡 Example: CH1=4 Mbps, CH2-5=2 Mbps each → Total 12 Mbps → ~87.38h');
+        console.log('[JC450 Debug] ========================================');
+        
+        // Bitrate warning
         const bitrateWarning = totalBitrate > MAX_TOTAL_BITRATE 
             ? `⚠️ Bitrate total (${totalBitrate.toFixed(1)} Mbps) excede o limite de hardware (${MAX_TOTAL_BITRATE} Mbps). Reduza a qualidade.`
             : null;
         
-        // Recording time is limited by the card that fills first
-        // Handle cases where one card might have no active channels
-        const sd1Time = sd1Result.channelCount > 0 ? sd1Result.timeHours : Infinity;
-        const sd2Time = sd2Result.channelCount > 0 ? sd2Result.timeHours : Infinity;
-        
-        const limitingCard = sd1Time <= sd2Time ? 'SD1' : 'SD2';
-        const totalTimeHours = Math.min(sd1Time, sd2Time);
-        const totalTimeDays = isFinite(totalTimeHours) ? totalTimeHours / 24 : 0;
-        
-        console.log('Tempo total do sistema:', totalTimeHours.toFixed(1), 'h = min(', sd1Time.toFixed(1), ',', sd2Time.toFixed(1), ') - Limitado por:', limitingCard);
-        console.log('Bitrate total:', totalBitrate.toFixed(1), 'Mbps');
-        console.log('---');
-        
         // Variation range
-        const variationRange = this.getVariationRange(totalTimeHours);
+        const variationRange = this.getVariationRange(timeHours);
         
-        // Combine all channel results for display
-        const allChannelResults = [...sd1Result.channelResults, ...sd2Result.channelResults];
+        // FIXED: Build result structure compatible with display
+        // In dual card mode, we create virtual SD1/SD2 objects for display compatibility
+        const availableSpacePerCard = cardSizeGB * MB_PER_GB * this.config.usableSpacePercent;
         
         return {
             // Card information
             cardSizeGB,
             useOneCard,
+            availableSpaceMB: totalSpaceMB, // Total available space
             
-            // SD1 details
+            // Virtual SD1/SD2 details for display compatibility
+            // Note: In mirror mode, both cards record the same data
             sd1: {
                 cardName: 'SD1',
-                channels: 'CH1, CH2, CH3',
-                channelCount: sd1Result.channelCount,
-                totalBitrate: sd1Result.totalBitrate,
-                totalRateMBh: sd1Result.totalRateMBh,
-                totalRateGBh: sd1Result.totalRateGBh,
-                availableSpaceMB: sd1Result.availableSpaceMB,
-                timeHours: sd1Result.timeHours,
-                timeDays: sd1Result.timeDays,
-                channelResults: sd1Result.channelResults
+                channels: useOneCard ? 'All Channels' : 'All Channels (Mirror)',
+                channelCount: activeChannels.length,
+                totalBitrate: totalBitrate,
+                totalRateMBh: totalRateMBh,
+                totalRateGBh: totalRateGBh,
+                availableSpaceMB: availableSpacePerCard,
+                timeHours: timeHours,
+                timeDays: timeDays,
+                channelResults: channelResults
             },
             
-            // SD2 details
-            sd2: {
+            sd2: useOneCard ? null : {
                 cardName: 'SD2',
-                channels: 'CH4, CH5',
-                channelCount: sd2Result.channelCount,
-                totalBitrate: sd2Result.totalBitrate,
-                totalRateMBh: sd2Result.totalRateMBh,
-                totalRateGBh: sd2Result.totalRateGBh,
-                availableSpaceMB: sd2Result.availableSpaceMB,
-                timeHours: sd2Result.timeHours,
-                timeDays: sd2Result.timeDays,
-                channelResults: sd2Result.channelResults
+                channels: 'All Channels (Mirror)',
+                channelCount: activeChannels.length,
+                totalBitrate: totalBitrate,
+                totalRateMBh: totalRateMBh,
+                totalRateGBh: totalRateGBh,
+                availableSpaceMB: availableSpacePerCard,
+                timeHours: timeHours,
+                timeDays: timeDays,
+                channelResults: channelResults
             },
             
             // System totals
             totalBitrate,
-            totalRateMBh: sd1Result.totalRateMBh + sd2Result.totalRateMBh,
-            totalRateGBh: sd1Result.totalRateGBh + sd2Result.totalRateGBh,
-            totalRateGBday: (sd1Result.totalRateGBh + sd2Result.totalRateGBh) * 24,
+            totalRateMBh: totalRateMBh,
+            totalRateGBh: totalRateGBh,
+            totalRateGBday: totalRateGBh * 24,
             
-            // Recording time (limited by card that fills first)
-            totalTimeHours,
-            totalTimeDays,
-            limitingCard,
+            // Recording time
+            totalTimeHours: timeHours,
+            totalTimeDays: timeDays,
+            limitingCard: null, // Not applicable in mirror mode
             
-            // All channels combined
-            channelResults: allChannelResults,
-            activeChannels: allChannelResults.length,
+            // All channels
+            channelResults: channelResults,
+            activeChannels: activeChannels.length,
             
             // Warnings and metadata
             bitrateWarning,
@@ -570,15 +637,24 @@ class DVRCalculator {
                 maxDays: variationRange.max / 24
             },
             
-            note: `⚠️ O JC450 usa dois cartões SD independentes (SD1: CH1-3, SD2: CH4-5). ` +
-                  `O tempo total é limitado pelo cartão que enche primeiro (${limitingCard}). ` +
+            // FIXED: Dynamic note based on official documentation (Jimi IoT PDF V1.1.5)
+            note: useOneCard 
+                ? `⚠️ Modo de 1 cartão: Todos os ${activeChannels.length} canais gravam no mesmo cartão SD de ${cardSizeGB}GB. ` +
+                  `Espaço disponível: ${(totalSpaceMB / MB_PER_GB).toFixed(1)} GB. ` +
                   `Pequenas variações (±${this.config.variationMargin * 100}%) podem ocorrer devido a bitrate variável, ` +
                   `áudio, overhead do container TS e sistema de arquivos.`
+                : `✅ Modo Dual Card (Two-card): Ambos os cartões gravam TODOS os canais (espelhamento/redundância). ` +
+                  `Espaço total disponível: ${(totalSpaceMB / MB_PER_GB).toFixed(1)} GB (${numberOfCards} × ${cardSizeGB}GB × 90%). ` +
+                  `Bitrate total: ${totalBitrate.toFixed(1)} Mbps. ` +
+                  `Tempo de gravação: ${timeHours.toFixed(2)}h. ` +
+                  `Pequenas variações (±${this.config.variationMargin * 100}%) podem ocorrer devido a fatores de gravação real.`
         };
     }
 
     /**
      * Helper function to calculate a single card with assigned channels
+     * NOTE: This function is kept for backward compatibility but not used in JC450 dual card mode.
+     * JC450 now uses mirror/redundancy mode where both cards record all channels.
      * @param {number} cardSizeGB - Card size in GB
      * @param {Array} channels - Channels assigned to this card
      * @param {string} cardName - Name/ID of the card (SD1 or SD2)

@@ -4,47 +4,6 @@ const dvrModels = {
         name: 'JC181',
         maxCapacity: 128,
         cardSizes: [16, 32, 64, 128],
-        presets: [
-            {
-                id: 'default',
-                name: 'Default',
-                nameEn: 'Default',
-                namePt: 'Padrão',
-                description: 'CH1: 720P@4M + CH2: 360P@0.5M (fixed)',
-                channels: [
-                    { id: 'CH1', resolution: '720', fps: 25, bitrate: 4 },
-                    { id: 'CH2', resolution: '360', fps: 25, bitrate: 0.5, fixed: true }
-                ],
-                totalBitrate: 4.5,
-                estimatedTime: { '32': 14.5, '64': 29.1, '128': 58.3 }
-            },
-            {
-                id: 'high_resolution',
-                name: 'High Resolution',
-                nameEn: 'High Resolution',
-                namePt: 'Alta Resolução',
-                description: 'CH1: 1080P@8M + CH2: 360P@0.5M (fixed)',
-                channels: [
-                    { id: 'CH1', resolution: '1080', fps: 25, bitrate: 8 },
-                    { id: 'CH2', resolution: '360', fps: 25, bitrate: 0.5, fixed: true }
-                ],
-                totalBitrate: 8.5,
-                estimatedTime: { '32': 7.7, '64': 15.4, '128': 30.8 }
-            },
-            {
-                id: 'long_recording',
-                name: 'Long Recording',
-                nameEn: 'Longest Recording Time',
-                namePt: 'Maior Tempo de Gravação',
-                description: 'CH1: 480P@1M + CH2: 360P@0.5M (fixed)',
-                channels: [
-                    { id: 'CH1', resolution: '480', fps: 25, bitrate: 1 },
-                    { id: 'CH2', resolution: '360', fps: 25, bitrate: 0.5, fixed: true }
-                ],
-                totalBitrate: 1.5,
-                estimatedTime: { '32': 43.7, '64': 87.4, '128': 174.8 }
-            }
-        ],
         channels: [
             {
                 id: 'CH1',
@@ -59,14 +18,14 @@ const dvrModels = {
             },
             {
                 id: 'CH2',
-                name: 'CH2 - Internal Camera (Fixed: 360P@0.5M)',
+                name: 'CH2 - Internal Camera (Fixed: 360P@0.5M@10fps)',
                 configurable: false,
                 fixed: true,
                 resolution: '360',
-                fps: 25,
+                fps: 10,  // FIXED - Internal camera only supports 10fps
                 bitrate: 0.5,
                 resolutions: [
-                    { value: '360', label: '360P (640×360) - Fixed @0.5M', bitrates: [0.5] }
+                    { value: '360', label: '360P (640×360) - Fixed @0.5M @10fps', bitrates: [0.5] }
                 ]
             }
         ],
@@ -84,8 +43,8 @@ const dvrModels = {
                 commands.push(`VIDEO,PARAM,1,${ch1.resolution},${ch1.fps},${ch1.bitrate}#`);
             }
             
-            // CH2 é sempre fixo: 360P@0.5M@25fps (não precisa comando)
-            commands.push('# CH2 (Internal Camera) is fixed: 360P (640×360) @ 0.5M @ 25fps');
+            // CH2 é sempre fixo: 360P@0.5M@10fps (não precisa comando)
+            commands.push('# CH2 (Internal Camera) is fixed: 360P (640×360) @ 0.5M @ 10fps');
             
             return commands.join('\n');
         }
@@ -95,64 +54,6 @@ const dvrModels = {
         name: 'JC371',
         maxCapacity: 256,
         cardSizes: [16, 32, 64, 128, 256],
-        presets: [
-            {
-                id: 'default',
-                name: 'Default',
-                nameEn: 'Default',
-                namePt: 'Padrão',
-                description: 'CH1: 1080P@8M, CH2/CH3: 720P@4M (H.264)',
-                channels: [
-                    { id: 'CH1', resolution: '1080', fps: 25, bitrate: 8, codec: 'H264' },
-                    { id: 'CH2', resolution: '720', fps: 15, bitrate: 4, codec: 'H264' },
-                    { id: 'CH3', resolution: '720', fps: 15, bitrate: 4, codec: 'H264' }
-                ],
-                totalBitrate: 16,
-                estimatedTime: { '32': 4.1, '128': 16.4, '256': 32.8 }
-            },
-            {
-                id: 'high_resolution',
-                name: 'High Resolution',
-                nameEn: 'High Resolution',
-                namePt: 'Alta Resolução',
-                description: 'All channels: 1080P@8M (H.264)',
-                channels: [
-                    { id: 'CH1', resolution: '1080', fps: 25, bitrate: 8, codec: 'H264' },
-                    { id: 'CH2', resolution: '1080', fps: 15, bitrate: 8, codec: 'H264' },
-                    { id: 'CH3', resolution: '1080', fps: 15, bitrate: 8, codec: 'H264' }
-                ],
-                totalBitrate: 24,
-                estimatedTime: { '32': 2.7, '128': 10.9, '256': 21.9 }
-            },
-            {
-                id: 'h265_optimized',
-                name: 'H.265 Optimized',
-                nameEn: 'H.265 Optimized',
-                namePt: 'Otimizado H.265',
-                description: 'CH1: 1080P@8M, CH2/CH3: 720P@4M (H.265)',
-                channels: [
-                    { id: 'CH1', resolution: '1080', fps: 25, bitrate: 8, codec: 'H265' },
-                    { id: 'CH2', resolution: '720', fps: 15, bitrate: 4, codec: 'H265' },
-                    { id: 'CH3', resolution: '720', fps: 15, bitrate: 4, codec: 'H265' }
-                ],
-                totalBitrate: 11.2,
-                estimatedTime: { '32': 5.9, '128': 23.4, '256': 46.9 }
-            },
-            {
-                id: 'long_recording',
-                name: 'Long Recording',
-                nameEn: 'Longest Recording Time',
-                namePt: 'Maior Tempo de Gravação',
-                description: 'All channels: 360P@0.5M (H.264)',
-                channels: [
-                    { id: 'CH1', resolution: '360', fps: 25, bitrate: 0.5, codec: 'H264' },
-                    { id: 'CH2', resolution: '360', fps: 15, bitrate: 0.5, codec: 'H264' },
-                    { id: 'CH3', resolution: '360', fps: 15, bitrate: 0.5, codec: 'H264' }
-                ],
-                totalBitrate: 1.5,
-                estimatedTime: { '32': 43.7, '128': 174.8, '256': 349.5 }
-            }
-        ],
         channels: [
             { id: 'CH1', name: 'CH1 - Road Facing' },
             { id: 'CH2', name: 'CH2 - USB Camera' },
@@ -196,34 +97,6 @@ const dvrModels = {
         name: 'JC400',
         maxCapacity: 256,
         cardSizes: [16, 32, 64, 128, 256],
-        presets: [
-            {
-                id: 'default',
-                name: 'Default',
-                nameEn: 'High Resolution (Default)',
-                namePt: 'Alta Resolução (Padrão)',
-                description: 'OUT: 1080P@8M, IN: 720P@6M',
-                channels: [
-                    { id: 'OUT', resolution: '1080', fps: 25, bitrate: 8, preset: '0' },
-                    { id: 'IN', resolution: '720', fps: 25, bitrate: 6, preset: '0' }
-                ],
-                totalBitrate: 14,
-                estimatedTime: { '32': 4.7, '128': 18.7, '256': 37.4 }
-            },
-            {
-                id: 'long_recording',
-                name: 'Long Recording',
-                nameEn: 'Longest Recording Time',
-                namePt: 'Maior Tempo de Gravação',
-                description: 'Both: 360P@0.5M',
-                channels: [
-                    { id: 'OUT', resolution: '360', fps: 25, bitrate: 0.5, preset: '3' },
-                    { id: 'IN', resolution: '360', fps: 25, bitrate: 0.5, preset: '3' }
-                ],
-                totalBitrate: 1,
-                estimatedTime: { '32': 65.5, '128': 262.1, '256': 524.3 }
-            }
-        ],
         channels: [
             {
                 id: 'OUT',
@@ -239,7 +112,7 @@ const dvrModels = {
                 id: 'IN',
                 name: 'IN Camera',
                 presets: [
-                    { value: '0', label: '720P@6M', resolution: '720', bitrate: 6, fps: 25 },
+                    { value: '0', label: '720P@4M', resolution: '720', bitrate: 4, fps: 25 },
                     { value: '1', label: '720P@3M', resolution: '720', bitrate: 3, fps: 25 },
                     { value: '2', label: '480P@2M', resolution: '480', bitrate: 2, fps: 25 },
                     { value: '3', label: '360P@0.5M', resolution: '360', bitrate: 0.5, fps: 25 }
@@ -273,56 +146,6 @@ const dvrModels = {
         cardSizes: [16, 32, 64, 128, 256],
         dualCard: true,
         cardDescription: '2 cartões SD (capacidade total combinada)',
-        presets: [
-            {
-                id: 'default',
-                name: 'Default',
-                nameEn: 'Default',
-                namePt: 'Padrão',
-                description: 'CH1: 720P@2M, CH2-5: 480P@1M',
-                channels: [
-                    { id: 'CH1', resolution: '720', fps: 25, bitrate: 2 },
-                    { id: 'CH2', resolution: '480', fps: 15, bitrate: 1 },
-                    { id: 'CH3', resolution: '480', fps: 15, bitrate: 1 },
-                    { id: 'CH4', resolution: '480', fps: 15, bitrate: 1 },
-                    { id: 'CH5', resolution: '480', fps: 15, bitrate: 1 }
-                ],
-                totalBitrate: 6,
-                estimatedTime: { '128': 43.7, '256': 87.4 }
-            },
-            {
-                id: 'high_resolution',
-                name: 'High Resolution',
-                nameEn: 'High Resolution',
-                namePt: 'Alta Resolução',
-                description: 'CH1: 1080P@4M, CH2-5: 720P@2M',
-                channels: [
-                    { id: 'CH1', resolution: '1080', fps: 25, bitrate: 4 },
-                    { id: 'CH2', resolution: '720', fps: 15, bitrate: 2 },
-                    { id: 'CH3', resolution: '720', fps: 15, bitrate: 2 },
-                    { id: 'CH4', resolution: '720', fps: 15, bitrate: 2 },
-                    { id: 'CH5', resolution: '720', fps: 15, bitrate: 2 }
-                ],
-                totalBitrate: 12,
-                estimatedTime: { '128': 21.8, '256': 43.7 }
-            },
-            {
-                id: 'long_recording',
-                name: 'Long Recording',
-                nameEn: 'Longest Recording Time',
-                namePt: 'Maior Tempo de Gravação',
-                description: 'All: 480P@1M',
-                channels: [
-                    { id: 'CH1', resolution: '480', fps: 25, bitrate: 1 },
-                    { id: 'CH2', resolution: '480', fps: 15, bitrate: 1 },
-                    { id: 'CH3', resolution: '480', fps: 15, bitrate: 1 },
-                    { id: 'CH4', resolution: '480', fps: 15, bitrate: 1 },
-                    { id: 'CH5', resolution: '480', fps: 15, bitrate: 1 }
-                ],
-                totalBitrate: 5,
-                estimatedTime: { '128': 52.4, '256': 104.9 }
-            }
-        ],
         channels: [
             { id: 'CH1', name: 'CH1 - Road Facing/ADAS' },
             { id: 'CH2', name: 'CH2 - USB Camera' },
