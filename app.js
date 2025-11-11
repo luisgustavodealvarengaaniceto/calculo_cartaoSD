@@ -1071,15 +1071,36 @@ function generateAutoConfig() {
         if (priorityChannelIndex === -2) {
             // FREE MODE: Use channel priority order (JC371: CH2->CH1->CH3, JC450: CH3->CH1->CH2->CH4->CH5, JC400: IN->OUT)
             let bestScore = -Infinity;
+            const scoredConfigs = []; // Track all configs with scores
+            
             validConfigs.forEach(configSet => {
                 const timeDifference = configSet.calculatedTime - totalDesiredHours; // Positive = above desired
                 const totalScore = calculateFreeModeScore(configSet, timeDifference);
+                
+                scoredConfigs.push({
+                    config: configSet,
+                    score: totalScore,
+                    timeDiff: timeDifference
+                });
                 
                 if (totalScore > bestScore) {
                     bestScore = totalScore;
                     bestConfig = configSet;
                 }
             });
+            
+            // Log top 3 configurations for debugging
+            scoredConfigs.sort((a, b) => b.score - a.score);
+            console.log('   🏆 Top 3 configurations by score:');
+            scoredConfigs.slice(0, 3).forEach((item, index) => {
+                const bitrates = item.config.configs.map(c => `${c?.bitrate || 0}M`).join(', ');
+                console.log(`   ${index + 1}. Score: ${item.score.toFixed(0)} | Time: ${item.config.calculatedTime.toFixed(1)}h | Bitrates: ${bitrates}`);
+            });
+            
+            // Show detailed scoring for winner
+            console.log('   🎯 Detailed scoring for selected config:');
+            calculateFreeModeScore(bestConfig, bestConfig.calculatedTime - totalDesiredHours, true);
+            
             console.log('   🎨 Free mode: Selected config with priority order score');
         } else if (priorityChannelIndex >= 0) {
             // Priority mode: find config >= desired time with best score (close to time + high priority bitrate)
@@ -1203,6 +1224,47 @@ function generateAutoConfig() {
                     }
                 }
             }
+        });
+    }
+    
+    // Calculate TRUE MAXIMUM time possible (all channels at minimum bitrate)
+    const maxPossibleConfig = allPossibleConfigs.reduce((max, config) => {
+        return (!max || config.calculatedTime > max.calculatedTime) ? config : max;
+    }, null);
+    
+    const maxPossibleTime = maxPossibleConfig ? maxPossibleConfig.calculatedTime : 0;
+    console.log(`⏱️ TRUE MAXIMUM time possible: ${maxPossibleTime.toFixed(1)}h (all channels at minimum bitrate)`);
+    
+    // Check if desired time is impossible even with minimum bitrates
+    if (maxPossibleTime < totalDesiredHours) {
+        const timeDifferencePercent = ((totalDesiredHours - maxPossibleTime) / totalDesiredHours) * 100;
+        console.log(`⚠️ WARNING: Desired time ${totalDesiredHours.toFixed(1)}h exceeds maximum possible ${maxPossibleTime.toFixed(1)}h (${timeDifferencePercent.toFixed(0)}% over)`);
+        
+        // Show warning modal
+        const availableCardSizes = currentModel.cardSizes || [16, 32, 64, 128, 256];
+        const currentCardIndex = availableCardSizes.indexOf(cardSize);
+        const nextCardSize = currentCardIndex < availableCardSizes.length - 1 
+            ? availableCardSizes[currentCardIndex + 1] 
+            : null;
+        
+        let solutionText = '';
+        if (nextCardSize) {
+            solutionText = currentLang === 'pt-BR'
+                ? 'Use um cartão SD de ' + nextCardSize + 'GB ou maior para atingir o tempo desejado.'
+                : 'Use an SD card of ' + nextCardSize + 'GB or larger to achieve the desired time.';
+        } else {
+            solutionText = currentLang === 'pt-BR'
+                ? 'Use o maior cartão SD disponível (' + availableCardSizes[availableCardSizes.length - 1] + 'GB) ou reduza o tempo desejado de gravação.'
+                : 'Use the largest available SD card (' + availableCardSizes[availableCardSizes.length - 1] + 'GB) or reduce the desired recording time.';
+        }
+        
+        showWarningModal({
+            desiredHours: totalDesiredHours,
+            desiredDays: totalDesiredHours / 24,
+            currentCard: cardSize,
+            maxHours: maxPossibleTime,
+            maxDays: maxPossibleTime / 24,
+            solution: solutionText
         });
     }
     
@@ -1664,24 +1726,102 @@ function showMoreAlternatives() {
     }
     
     // STRATEGY 3: Maximum recording time (EXCLUDING previous two)
-    console.log('⏱️ 3️⃣ Selecting MAX TIME...');
-    const sortedByMaxTime = [...alternativesWithResults]
-        .filter(alt => !selectedAlternatives.find(sel => 
-            JSON.stringify(sel.configs) === JSON.stringify(alt.configs)
-        ))
-        .sort((a, b) => b.results.totalTimeHours - a.results.totalTimeHours);
+    console.log('⏱️ 3️⃣ Selecting TRUE MAX TIME (minimum bitrates)...');
     
-    if (sortedByMaxTime[0]) {
+    // Generate REAL maximum time config (all channels at absolute minimum bitrate)
+    const minBitrateConfigs = [];
+    for (let i = 0; i < currentModel.channels.length; i++) {
+        if (!activeChannels.includes(i)) {
+            minBitrateConfigs.push(null);
+            continue;
+        }
+        
+        const channel = currentModel.channels[i];
+        if (currentModel.name === 'JC400') {
+            // JC400: Use preset 3 (lowest bitrate preset)
+            const preset = channel.presets[channel.presets.length - 1]; // Last preset = lowest
+            minBitrateConfigs.push({
+                preset: channel.presets.length - 1,
+                resolution: preset.resolution,
+                fps: preset.fps,
+                bitrate: preset.bitrate,
+                codec: 'H.264'
+            });
+        } else if (currentModel.name === 'JC181' && i === 1) {
+            // JC181 CH2 is fixed
+            minBitrateConfigs.push({
+                resolution: '360',
+                fps: 10,
+                bitrate: 0.5,
+                codec: 'H.264',
+                fixed: true
+            });
+        } else {
+            // Find minimum bitrate for this channel
+            // For JC371/JC450: resolutions are in currentModel, not in channel
+            const resolutions = channel.resolutions || currentModel.resolutions;
+            const fps = channel.fps || currentModel.fps;
+            
+            if (!resolutions || !fps) {
+                console.error('No resolutions or fps found for channel', i);
+                minBitrateConfigs.push(null);
+                continue;
+            }
+            
+            const minRes = resolutions[resolutions.length - 1]; // Last = lowest resolution
+            const minBitrate = Math.min(...minRes.bitrates);
+            const minFps = Math.min(...fps);
+            minBitrateConfigs.push({
+                resolution: minRes.value,
+                fps: minFps,
+                bitrate: minBitrate,
+                codec: 'H.264'
+            });
+        }
+    }
+    
+    // Calculate time for this config
+    const channels = minBitrateConfigs.map((cfg, idx) => ({
+        ...cfg,
+        active: cfg !== null,
+        channelId: currentModel.channels[idx].id,
+        channelName: currentModel.channels[idx].name
+    })).filter(ch => ch.active);
+    
+    let maxTimeResults;
+    if (currentModel.name === 'JC450') {
+        maxTimeResults = calculator.calculateJC450DualCard(cardSize, channels, useOneCardOnly);
+    } else {
+        maxTimeResults = calculator.calculateTotal(cardSize, channels, false);
+    }
+    
+    const maxTimeAlternative = {
+        configs: minBitrateConfigs,
+        channels: channels,
+        results: maxTimeResults,
+        multiplier: 0.5, // Lowest quality = lowest multiplier
+        strategy: 'absolute-max-time',
+        name: 'Máximo Tempo Possível'
+    };
+    
+    // Only add if it's different from already selected alternatives
+    const isDuplicate = selectedAlternatives.find(sel => 
+        JSON.stringify(sel.configs) === JSON.stringify(maxTimeAlternative.configs)
+    );
+    
+    if (!isDuplicate) {
         selectedAlternatives.push({
-            ...sortedByMaxTime[0],
+            ...maxTimeAlternative,
             badge: 'Máximo Tempo',
             badgeIcon: '⏱️',
             badgeClass: 'bg-orange-100 text-orange-700 border-orange-300',
-            description: 'Máximo tempo de gravação possível no cartão'
+            description: 'Máximo tempo de gravação possível no cartão (menor qualidade)'
         });
-        console.log('✅ Added MAX TIME:', sortedByMaxTime[0].results.totalTimeHours.toFixed(1) + 'h',
-                   'FPS:', sortedByMaxTime[0].channels.map(ch => ch.fps).join(','),
-                   'Bitrate:', sortedByMaxTime[0].channels.reduce((s, c) => s + c.bitrate, 0) + 'M');
+        console.log('✅ Added TRUE MAX TIME:', maxTimeResults.totalTimeHours.toFixed(1) + 'h',
+                   'FPS:', minBitrateConfigs.filter(c => c).map(ch => ch.fps).join(','),
+                   'Bitrate:', minBitrateConfigs.filter(c => c).reduce((s, c) => s + c.bitrate, 0) + 'M');
+    } else {
+        console.log('⚠️ MAX TIME config is duplicate, skipping');
     }
     
     console.log('📋 Total selected alternatives:', selectedAlternatives.length);
@@ -1940,27 +2080,62 @@ function getChannelPriorityOrder() {
 }
 
 // Calculate priority score for a configuration in free mode
-function calculateFreeModeScore(configSet, timeDifference) {
+function calculateFreeModeScore(configSet, timeDifference, debugMode = false) {
     const priorityOrder = getChannelPriorityOrder();
     let bitrateScore = 0;
     
-    // Weights more balanced - reducing difference between levels
-    // This encourages better distribution across all channels
-    // 1st: 10, 2nd: 7, 3rd: 5, 4th: 3.5, 5th: 2.5
-    // Much closer together to avoid extreme concentration on first channel
-    const weights = [10, 7, 5, 3.5, 2.5, 1.5];
+    // JC371-specific enhanced weights for better priority enforcement
+    // CH2 (USB) gets highest weight, followed by CH1 (Road), then CH3 (DMS)
+    let weights;
+    if (currentModel.name === 'JC371') {
+        // Enhanced weights: CH2=100, CH1=85, CH3=65
+        // Stronger differentiation to enforce priority clearly
+        weights = [100, 85, 65];
+        
+        // BALANCE BONUS: Give extra points when bitrates are more evenly distributed
+        // This prevents extreme scenarios like 8M/0.5M/0.5M
+        const bitrates = configSet.configs.map(c => c?.bitrate || 0);
+        const avgBitrate = bitrates.reduce((a, b) => a + b, 0) / bitrates.length;
+        const variance = bitrates.reduce((sum, br) => sum + Math.pow(br - avgBitrate, 2), 0) / bitrates.length;
+        const balanceBonus = 800 / (1 + variance); // Higher bonus for balanced configs
+        
+        // PROXIMITY BONUS: Extra points when CH2 and CH1 are close in bitrate
+        const ch2Bitrate = configSet.configs[1]?.bitrate || 0; // CH2 index=1
+        const ch1Bitrate = configSet.configs[0]?.bitrate || 0; // CH1 index=0
+        const bitrateDiff = Math.abs(ch2Bitrate - ch1Bitrate);
+        const proximityBonus = Math.max(0, 300 - (bitrateDiff * 50)); // Max 300 points when diff ≤ 2M
+        
+        bitrateScore += balanceBonus + proximityBonus;
+        
+        if (debugMode) {
+            console.log(`   🎨 JC371 Scoring: Balance Bonus=${balanceBonus.toFixed(0)}, Proximity Bonus=${proximityBonus.toFixed(0)}`);
+        }
+    } else {
+        // Default weights for other models
+        weights = [10, 7, 5, 3.5, 2.5, 1.5];
+    }
     
     priorityOrder.forEach((channelIndex, priorityLevel) => {
         if (configSet.configs[channelIndex] && configSet.configs[channelIndex] !== null) {
             const bitrate = configSet.configs[channelIndex].bitrate || 0;
             const weight = weights[priorityLevel] || 1;
-            bitrateScore += bitrate * weight;
+            const channelScore = bitrate * weight;
+            bitrateScore += channelScore;
+            
+            if (debugMode) {
+                const chName = currentModel.channels[channelIndex]?.name || `CH${channelIndex}`;
+                console.log(`   📊 ${chName}: ${bitrate}M × weight ${weight} = ${channelScore.toFixed(1)} points`);
+            }
         }
     });
     
     // Time score: strongly prefer configs closer to desired time
-    // Increased weight on time to prioritize matching the desired duration
     const timeScore = 50000 / (1 + Math.abs(timeDifference));
+    
+    if (debugMode) {
+        console.log(`   ⏱️ Time score: ${timeScore.toFixed(0)} (diff: ${timeDifference.toFixed(1)}h)`);
+        console.log(`   ✅ Total score: ${(timeScore + bitrateScore).toFixed(0)}`);
+    }
     
     // Combined score: time is primary, quality hierarchy is secondary influence
     return timeScore + bitrateScore;
