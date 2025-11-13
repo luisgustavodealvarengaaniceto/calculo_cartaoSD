@@ -104,18 +104,18 @@ const dvrModels = {
                 presets: [
                     { value: '0', label: '1080P@8M', resolution: '1080', bitrate: 8, fps: 25 },
                     { value: '1', label: '720P@4M', resolution: '720', bitrate: 4, fps: 25 },
-                    { value: '2', label: '480P@2M', resolution: '480', bitrate: 2, fps: 25 },
-                    { value: '3', label: '360P@0.5M', resolution: '360', bitrate: 0.5, fps: 25 }
+                    { value: '2', label: '480P@2M (720×480)', resolution: '480', bitrate: 2, fps: 25 },
+                    { value: '3', label: '360P@0.5M (640×360)', resolution: '360', bitrate: 0.5, fps: 25 }
                 ]
             },
             {
                 id: 'IN',
                 name: 'IN Camera',
                 presets: [
-                    { value: '0', label: '720P@4M', resolution: '720', bitrate: 4, fps: 25 },
+                    { value: '0', label: '720P@6M', resolution: '720', bitrate: 6, fps: 25 },
                     { value: '1', label: '720P@3M', resolution: '720', bitrate: 3, fps: 25 },
-                    { value: '2', label: '480P@2M', resolution: '480', bitrate: 2, fps: 25 },
-                    { value: '3', label: '360P@0.5M', resolution: '360', bitrate: 0.5, fps: 25 }
+                    { value: '2', label: '480P@2M (720×480)', resolution: '480', bitrate: 2, fps: 25 },
+                    { value: '3', label: '360P@0.5M (640×360)', resolution: '360', bitrate: 0.5, fps: 25 }
                 ]
             }
         ],
@@ -125,6 +125,8 @@ const dvrModels = {
             // JC400 uses preset mode with descriptive comments
             // CAMERA,<channel>,<preset>#
             // Presets define resolution, fps, and bitrate combinations
+            // OUT presets: 0=1080P@8M, 1=720P@4M, 2=480P@2M, 3=360P@0.5M
+            // IN presets: 0=720P@6M, 1=720P@3M, 2=480P@2M, 3=360P@0.5M
             
             config.channels.forEach((ch) => {
                 if (!ch.active) return;

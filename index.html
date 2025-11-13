@@ -283,6 +283,19 @@
                     </div>
                 </div>
 
+                <!-- Daily Usage Hours (Global - visible in both modes) -->
+                <div id="globalDailyUsageSection" class="mt-6 p-4 bg-green-50 rounded-lg border-2 border-green-300">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fas fa-car text-green-600 mr-2"></i>
+                        Horas de Uso do Veículo por Dia
+                    </label>
+                    <input type="number" id="dailyUsageHours" min="1" max="24" step="0.5" value="24" class="w-full px-4 py-3 border-2 border-green-300 rounded-lg bg-white text-gray-800 focus:ring-2 focus:ring-green-500 focus:border-green-500 text-xl font-bold text-center">
+                    <p class="text-xs text-gray-600 mt-2 text-center">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Quantas horas por dia o veículo fica ligado gravando
+                    </p>
+                </div>
+
                 <!-- Calculate Button (initially hidden) -->
                 <div id="calculateButtonSection" class="mt-6 flex space-x-4 hidden">
                     <button id="calculateBtn" class="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-xl">
@@ -304,38 +317,6 @@
                     <h2 class="text-2xl font-bold text-gray-800">
                         Resultados
                     </h2>
-                </div>
-
-                <!-- Summary Cards -->
-                <div class="grid grid-cols-1 gap-4 mb-6">
-                    <!-- Tempo Total Card -->
-                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-8 shadow-lg">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="flex-1">
-                                <span class="text-lg opacity-90 block mb-3">Tempo Total de Gravação</span>
-                                <div class="grid grid-cols-2 gap-6">
-                                    <div class="text-center p-4 bg-white bg-opacity-20 rounded-lg">
-                                        <div class="text-4xl font-bold mb-1" id="totalTimeDays">-</div>
-                                        <div class="text-sm opacity-90">Dias</div>
-                                    </div>
-                                    <div class="text-center p-4 bg-white bg-opacity-20 rounded-lg">
-                                        <div class="text-4xl font-bold mb-1" id="totalTimeHours">-</div>
-                                        <div class="text-sm opacity-90">Horas</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <i class="fas fa-clock text-6xl opacity-30 ml-6"></i>
-                        </div>
-                        <div class="mt-4 pt-4 border-t border-white border-opacity-30">
-                            <div class="flex items-start text-sm opacity-95" id="ignitionNoteText">
-                                <i class="fas fa-info-circle mr-2 mt-1 flex-shrink-0"></i>
-                                <p>
-                                    <strong>Importante:</strong> Os dias indicados referem-se ao tempo contínuo com a ignição do veículo ligada. 
-                                    O tempo real pode variar conforme o padrão de uso do veículo.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Configuration Summary -->

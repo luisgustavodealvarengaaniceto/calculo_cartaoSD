@@ -47,6 +47,7 @@ const recommendedSection = document.getElementById('recommendedSection');
 const recommendedAlternatives = document.getElementById('recommendedAlternatives');
 const channelPriorityDiv = document.getElementById('channelPriorityDiv');
 const channelPrioritySelect = document.getElementById('channelPriority');
+const dailyUsageHoursInput = document.getElementById('dailyUsageHours');
 
 // State
 let isReverseCalcMode = false;
@@ -99,6 +100,9 @@ function attachEventListeners() {
     }
     if (desiredHoursInput) {
         desiredHoursInput.addEventListener('input', updateTotalDesiredTime);
+    }
+    if (dailyUsageHoursInput) {
+        dailyUsageHoursInput.addEventListener('input', updateTotalDesiredTime);
     }
     if (generateConfigBtn) {
         console.log('Generate config button found, attaching listener...');
@@ -905,10 +909,21 @@ function updateTotalDesiredTime() {
     
     const days = parseInt(desiredDaysInput.value) || 0;
     const hours = parseInt(desiredHoursInput.value) || 0;
-    const totalHours = (days * 24) + hours;
+    const dailyUsageHours = parseFloat(dailyUsageHoursInput?.value) || 24;
+    
+    // Calculate total recording hours based on daily usage
+    const totalHours = (days * dailyUsageHours) + hours;
     
     const hoursText = t('hours');
-    totalDesiredTimeSpan.textContent = totalHours + ' ' + hoursText + ' (' + days + 'd ' + hours + 'h)';
+    
+    if (dailyUsageHours === 24) {
+        // If 24h/day, show traditional format
+        totalDesiredTimeSpan.textContent = totalHours + ' ' + hoursText + ' (' + days + 'd ' + hours + 'h)';
+    } else {
+        // If custom daily usage, show calculation
+        totalDesiredTimeSpan.textContent = totalHours.toFixed(1) + ' ' + hoursText + 
+            ' (' + days + 'd × ' + dailyUsageHours + 'h/dia' + (hours > 0 ? ' + ' + hours + 'h' : '') + ')';
+    }
 }
 
 // Generate Auto Configuration
@@ -932,10 +947,17 @@ function generateAutoConfig() {
     const cardSize = parseInt(cardSizeSelect.value);
     const days = parseInt(desiredDaysInput.value) || 0;
     const hours = parseInt(desiredHoursInput.value) || 0;
-    const totalDesiredHours = (days * 24) + hours;
+    
+    // Get daily usage hours
+    const dailyUsageHours = parseFloat(dailyUsageHoursInput?.value) || 24;
+    
+    // Calculate total recording hours based on daily usage
+    // If user wants 50 days with 6h/day usage, total recording time = 50 * 6 = 300 hours
+    const totalDesiredHours = (days * dailyUsageHours) + hours;
     
     console.log('Card Size:', cardSize, 'GB');
-    console.log('Desired Time:', totalDesiredHours, 'hours', '(' + days + 'd ' + hours + 'h)');
+    console.log('Daily Usage Hours:', dailyUsageHours, 'h/day');
+    console.log('Desired Time:', totalDesiredHours, 'hours', '(' + days + 'd × ' + dailyUsageHours + 'h/day + ' + hours + 'h extra)');
     
     if (totalDesiredHours <= 0) {
         alert(currentLang === 'pt-BR' 
@@ -3140,13 +3162,52 @@ function collectChannelData() {
 
 // Display Results
 function displayResults(results) {
-    // 1. Update main time display - showing only days and hours
-    document.getElementById('totalTimeDays').textContent = results.totalTimeDays.toFixed(1);
-    document.getElementById('totalTimeHours').textContent = results.totalTimeHours.toFixed(1);
+    // Get daily usage hours from the global input (works for both auto and manual modes)
+    let dailyUsageHours = 24; // Default: 24 hours
     
-    // 2. Create configuration summary (REORGANIZED ORDER)
+    if (dailyUsageHoursInput) {
+        dailyUsageHours = parseFloat(dailyUsageHoursInput.value) || 24;
+    }
+    
+    // Calculate real days based on daily usage
+    const realDaysOfRecording = results.totalTimeHours / dailyUsageHours;
+    
+    // Create configuration summary (REORGANIZED ORDER)
     const configSummaryDiv = document.getElementById('configSummary');
     configSummaryDiv.innerHTML = '';
+    
+    // TEMPO TOTAL COM EXPLICAÇÃO DE DIAS REAIS
+    const timeExplanationSection = document.createElement('div');
+    timeExplanationSection.className = 'mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-300';
+    timeExplanationSection.innerHTML = '<div class="flex items-start">' +
+        '<i class="fas fa-clock text-blue-600 text-2xl mr-3"></i>' +
+        '<div class="flex-1">' +
+        '<h4 class="font-bold text-gray-800 text-lg mb-3">' +
+        'Tempo Total de Gravação' +
+        '</h4>' +
+        '<div class="grid grid-cols-1 md:grid-cols-2 gap-4">' +
+        '<div class="p-3 bg-white rounded-lg border-2 border-blue-200">' +
+        '<div class="text-xs text-gray-600 mb-1">Gravação Contínua (24h/dia)</div>' +
+        '<div class="font-bold text-2xl text-blue-700">' + results.totalTimeDays.toFixed(1) + ' dias</div>' +
+        '<div class="text-sm text-gray-600">' + results.totalTimeHours.toFixed(1) + ' horas</div>' +
+        '</div>' +
+        '<div class="p-3 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border-2 border-green-300">' +
+        '<div class="text-xs text-gray-600 mb-1">' +
+        '<i class="fas fa-car text-green-600 mr-1"></i>Uso Real (' + dailyUsageHours.toFixed(1) + 'h/dia)' +
+        '</div>' +
+        '<div class="font-bold text-2xl text-green-700">' + realDaysOfRecording.toFixed(1) + ' dias</div>' +
+        '<div class="text-sm text-gray-600">de gravações no cartão</div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="mt-3 p-3 bg-blue-100 rounded-lg text-sm text-gray-700">' +
+        '<i class="fas fa-info-circle text-blue-600 mr-2"></i>' +
+        '<strong>Explicação:</strong> Com o veículo ligado ' + dailyUsageHours.toFixed(1) + ' hora(s) por dia, ' +
+        'o cartão armazenará gravações de <strong>' + realDaysOfRecording.toFixed(1) + ' dias</strong>. ' +
+        'Se o veículo ficasse ligado 24 horas por dia, duraria ' + results.totalTimeDays.toFixed(1) + ' dias.' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+    configSummaryDiv.appendChild(timeExplanationSection);
     
     // 2.1 - COMANDO DO DISPOSITIVO
     const commandSection = document.createElement('div');
@@ -3363,6 +3424,23 @@ function displayResults(results) {
                 '</div>' : '') +
             '</div>' +
             
+            // Real days explanation for JC450
+            '<div class="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-3 border-2 border-green-300 mb-3">' +
+            '<div class="text-xs text-gray-700 mb-2">' +
+            '<i class="fas fa-car text-green-600 mr-1"></i><strong>Dias Reais de Gravação:</strong>' +
+            '</div>' +
+            '<div class="grid grid-cols-2 gap-2 text-sm">' +
+            '<div>' +
+            '<span class="text-gray-600">24h/dia:</span> ' +
+            '<span class="font-bold text-gray-800">' + results.totalTimeDays.toFixed(1) + ' dias</span>' +
+            '</div>' +
+            '<div>' +
+            '<span class="text-gray-600">' + dailyUsageHours.toFixed(1) + 'h/dia:</span> ' +
+            '<span class="font-bold text-green-700">' + realDaysOfRecording.toFixed(1) + ' dias</span>' +
+            '</div>' +
+            '</div>' +
+            '</div>' +
+            
             // Important note
             '<div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">' +
             '<div class="flex items-start">' +
@@ -3510,8 +3588,16 @@ function displayResults(results) {
     configSummaryDiv.appendChild(accuracyNotice);
     
     // 2.6 - CONSUMO TOTAL
-    const totalConsumption = results.channelResults.reduce((sum, ch) => 
-        sum + (ch.bitrate * 450 * results.totalTimeHours / 1000), 0);
+    // Dados gravados = Taxa total (MB/h) × Tempo de gravação (horas)
+    // Isso representa quanto será realmente gravado até o cartão encher
+    const totalConsumption = (results.totalRateMBh * results.totalTimeHours) / 1000; // GB
+    const totalRateGBh = results.totalRateMBh / 1000; // GB/h
+    
+    console.log('🔍 [DEBUG] Cálculo de Consumo Total:');
+    console.log('   - Taxa total:', results.totalRateMBh.toFixed(2), 'MB/h');
+    console.log('   - Tempo de gravação:', results.totalTimeHours.toFixed(2), 'horas');
+    console.log('   - Dados gravados:', totalConsumption.toFixed(2), 'GB');
+    console.log('   - Espaço disponível:', (results.availableSpaceMB / 1000).toFixed(2), 'GB');
     
     const consumptionSummary = document.createElement('div');
     consumptionSummary.className = 'mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border-2 border-purple-300';
@@ -3528,7 +3614,7 @@ function displayResults(results) {
         '</div>' +
         '<div class="p-3 bg-blue-100 rounded-lg border border-blue-300">' +
         '<div class="text-xs text-blue-700 mb-1">Taxa Média</div>' +
-        '<div class="font-bold text-2xl text-blue-800">' + (totalConsumption * 1000 / results.totalTimeHours).toFixed(0) + ' MB/h</div>' +
+        '<div class="font-bold text-2xl text-blue-800">' + results.totalRateMBh.toFixed(0) + ' MB/h</div>' +
         '</div>' +
         '</div>' +
         '</div>' +
@@ -3959,6 +4045,23 @@ function loadSavedState() {
                 '</div>' : '') +
             '</div>' +
             
+            // Real days explanation for JC450
+            '<div class="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-3 border-2 border-green-300 mb-3">' +
+            '<div class="text-xs text-gray-700 mb-2">' +
+            '<i class="fas fa-car text-green-600 mr-1"></i><strong>Dias Reais de Gravação:</strong>' +
+            '</div>' +
+            '<div class="grid grid-cols-2 gap-2 text-sm">' +
+            '<div>' +
+            '<span class="text-gray-600">24h/dia:</span> ' +
+            '<span class="font-bold text-gray-800">' + results.totalTimeDays.toFixed(1) + ' dias</span>' +
+            '</div>' +
+            '<div>' +
+            '<span class="text-gray-600">' + dailyUsageHours.toFixed(1) + 'h/dia:</span> ' +
+            '<span class="font-bold text-green-700">' + realDaysOfRecording.toFixed(1) + ' dias</span>' +
+            '</div>' +
+            '</div>' +
+            '</div>' +
+            
             // Important note
             '<div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">' +
             '<div class="flex items-start">' +
@@ -4103,8 +4206,14 @@ function loadSavedState() {
     }
     
     // Total consumption summary
-    const totalConsumption = results.channelResults.reduce((sum, ch) => 
-        sum + (ch.bitrate * 450 * results.totalTimeHours / 1000), 0);
+    // Dados gravados = Taxa total (MB/h) × Tempo de gravação (horas)
+    const totalConsumption = (results.totalRateMBh * results.totalTimeHours) / 1000; // GB
+    const totalRateGBh = results.totalRateMBh / 1000; // GB/h
+    
+    console.log('🔍 [DEBUG] Cálculo de Consumo Total:');
+    console.log('   - Taxa total:', results.totalRateMBh.toFixed(2), 'MB/h');
+    console.log('   - Tempo de gravação:', results.totalTimeHours.toFixed(2), 'horas');
+    console.log('   - Dados gravados:', totalConsumption.toFixed(2), 'GB');
     
     const consumptionSummary = document.createElement('div');
     consumptionSummary.className = 'mt-3 p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200';
@@ -4117,7 +4226,7 @@ function loadSavedState() {
         '<div class="font-bold text-purple-700 text-lg">' + totalConsumption.toFixed(2) + ' GB</div>' +
         '<div class="text-xs text-gray-600">' + 
         (currentLang === 'pt-BR' ? 'Taxa média: ' : 'Average rate: ') +
-        (totalConsumption * 1000 / results.totalTimeHours).toFixed(0) + ' MB/h' +
+        results.totalRateMBh.toFixed(0) + ' MB/h' +
         '</div>' +
         '</div>' +
         '</div>';

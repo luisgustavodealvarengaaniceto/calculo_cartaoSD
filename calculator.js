@@ -5,9 +5,9 @@ class DVRCalculator {
         this.config = {
             usableSpacePercent: 0.90,        // 90% of total capacity (editable)
             MB_PER_HOUR_PER_MBPS: 450,       // 1 Mbps = 450 MB/h (fixed formula)
-            MB_PER_GB: 1024,                 // Binary (1024) by default to match Jimi PDFs
+            MB_PER_GB: 1000,                 // Decimal (1000) - SD cards use decimal units (64GB = 64000 MB)
             defaultCodecMultiplier: 1.0,     // H.264 = 1.0, H.265 ≈ 0.6-0.8
-            useDecimalUnits: false,          // false = GiB (1024), true = GB (1000)
+            useDecimalUnits: true,           // true = GB (1000) - matches SD card specifications
             toleranceOK: 5,                  // Tolerance for OK status (%)
             toleranceWarn: 15,               // Tolerance for WARN status (%)
             
