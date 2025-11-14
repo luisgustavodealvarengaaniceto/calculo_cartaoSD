@@ -909,7 +909,7 @@ function updateTotalDesiredTime() {
     
     const days = parseInt(desiredDaysInput.value) || 0;
     const hours = parseInt(desiredHoursInput.value) || 0;
-    const dailyUsageHours = parseFloat(dailyUsageHoursInput?.value) || 24;
+    const dailyUsageHours = parseFloat(dailyUsageHoursInput && dailyUsageHoursInput.value) || 24;
     
     // Calculate total recording hours based on daily usage
     const totalHours = (days * dailyUsageHours) + hours;
@@ -949,7 +949,7 @@ function generateAutoConfig() {
     const hours = parseInt(desiredHoursInput.value) || 0;
     
     // Get daily usage hours
-    const dailyUsageHours = parseFloat(dailyUsageHoursInput?.value) || 24;
+    const dailyUsageHours = parseFloat(dailyUsageHoursInput && dailyUsageHoursInput.value) || 24;
     
     // Calculate total recording hours based on daily usage
     // If user wants 50 days with 6h/day usage, total recording time = 50 * 6 = 300 hours
@@ -986,7 +986,7 @@ function generateAutoConfig() {
     if (selectedPriorityChannel === 'free') {
         const priorityOrder = getChannelPriorityOrder();
         const channelNames = priorityOrder.map(chIdx => {
-            const ch = currentModel.channels?.[chIdx];
+            const ch = currentModel.channels && currentModel.channels[chIdx];
             return ch ? (ch.name || `CH${chIdx + 1}`) : `CH${chIdx + 1}`;
         });
         console.log('   📊 Channel priority order (highest to lowest):', channelNames.join(' > '));
@@ -1115,7 +1115,7 @@ function generateAutoConfig() {
             scoredConfigs.sort((a, b) => b.score - a.score);
             console.log('   🏆 Top 3 configurations by score:');
             scoredConfigs.slice(0, 3).forEach((item, index) => {
-                const bitrates = item.config.configs.map(c => `${c?.bitrate || 0}M`).join(', ');
+                const bitrates = item.config.configs.map(c => `${c && c.bitrate || 0}M`).join(', ');
                 console.log(`   ${index + 1}. Score: ${item.score.toFixed(0)} | Time: ${item.config.calculatedTime.toFixed(1)}h | Bitrates: ${bitrates}`);
             });
             
@@ -1130,7 +1130,7 @@ function generateAutoConfig() {
             validConfigs.forEach(configSet => {
                 // Penalize configs that are far from desired time
                 const timeDifference = configSet.calculatedTime - totalDesiredHours; // Positive = above desired
-                const priorityBitrate = configSet.configs[priorityChannelIndex]?.bitrate || 0;
+                const priorityBitrate = (configSet.configs[priorityChannelIndex] && configSet.configs[priorityChannelIndex].bitrate) || 0;
                 
                 // Score: prefer closer to desired time, then higher priority bitrate
                 // Use exponential penalty for time difference to strongly prefer closer times
@@ -1212,8 +1212,8 @@ function generateAutoConfig() {
                 if (diff < minHigherDiff) {
                     // If priority enabled, check if priority channel has same or higher bitrate
                     if (priorityChannelIndex >= 0) {
-                        const bestPriorityBitrate = bestConfig.configs[priorityChannelIndex]?.bitrate || 0;
-                        const altPriorityBitrate = configSet.configs[priorityChannelIndex]?.bitrate || 0;
+                        const bestPriorityBitrate = (bestConfig.configs[priorityChannelIndex] && bestConfig.configs[priorityChannelIndex].bitrate) || 0;
+                        const altPriorityBitrate = (configSet.configs[priorityChannelIndex] && configSet.configs[priorityChannelIndex].bitrate) || 0;
                         if (altPriorityBitrate >= bestPriorityBitrate * 0.8) { // Allow 20% lower
                             minHigherDiff = diff;
                             alternativeHigher = configSet;
@@ -1234,8 +1234,8 @@ function generateAutoConfig() {
                 if (diff < minLowerDiff) {
                     // If priority enabled, prefer higher priority bitrate
                     if (priorityChannelIndex >= 0) {
-                        const altPriorityBitrate = configSet.configs[priorityChannelIndex]?.bitrate || 0;
-                        const currentAltBitrate = alternativeLower?.configs[priorityChannelIndex]?.bitrate || 0;
+                        const altPriorityBitrate = (configSet.configs[priorityChannelIndex] && configSet.configs[priorityChannelIndex].bitrate) || 0;
+                        const currentAltBitrate = (alternativeLower && alternativeLower.configs[priorityChannelIndex] && alternativeLower.configs[priorityChannelIndex].bitrate) || 0;
                         if (altPriorityBitrate >= currentAltBitrate) {
                             minLowerDiff = diff;
                             alternativeLower = configSet;
@@ -1551,10 +1551,10 @@ function calculateAutoConfig(configs) {
         results, 
         channels,
         // Add alternatives from auto-config if available
-        bestConfig: configAlternatives?.bestConfig,
-        alternativeHigher: configAlternatives?.alternativeHigher,
-        alternativeLower: configAlternatives?.alternativeLower,
-        desiredTime: configAlternatives?.desiredTime
+        bestConfig: configAlternatives && configAlternatives.bestConfig,
+        alternativeHigher: configAlternatives && configAlternatives.alternativeHigher,
+        alternativeLower: configAlternatives && configAlternatives.alternativeLower,
+        desiredTime: configAlternatives && configAlternatives.desiredTime
     };
     
     console.log('📊 currentConfig created:', currentConfig);
@@ -2098,7 +2098,7 @@ function getChannelPriorityOrder() {
         return [1, 0];
     }
     // Default: sequential order
-    return Array.from({ length: currentModel.channels?.length || 4 }, (_, i) => i);
+    return Array.from({ length: currentModel.channels && channels.length || 4 }, (_, i) => i);
 }
 
 // Calculate priority score for a configuration in free mode
@@ -2116,14 +2116,14 @@ function calculateFreeModeScore(configSet, timeDifference, debugMode = false) {
         
         // BALANCE BONUS: Give extra points when bitrates are more evenly distributed
         // This prevents extreme scenarios like 8M/0.5M/0.5M
-        const bitrates = configSet.configs.map(c => c?.bitrate || 0);
+        const bitrates = configSet.configs.map(c => c && c.bitrate || 0);
         const avgBitrate = bitrates.reduce((a, b) => a + b, 0) / bitrates.length;
         const variance = bitrates.reduce((sum, br) => sum + Math.pow(br - avgBitrate, 2), 0) / bitrates.length;
         const balanceBonus = 800 / (1 + variance); // Higher bonus for balanced configs
         
         // PROXIMITY BONUS: Extra points when CH2 and CH1 are close in bitrate
-        const ch2Bitrate = configSet.configs[1]?.bitrate || 0; // CH2 index=1
-        const ch1Bitrate = configSet.configs[0]?.bitrate || 0; // CH1 index=0
+        const ch2Bitrate = (configSet.configs[1] && configSet.configs[1].bitrate) || 0; // CH2 index=1
+        const ch1Bitrate = (configSet.configs[0] && configSet.configs[0].bitrate) || 0; // CH1 index=0
         const bitrateDiff = Math.abs(ch2Bitrate - ch1Bitrate);
         const proximityBonus = Math.max(0, 300 - (bitrateDiff * 50)); // Max 300 points when diff ≤ 2M
         
@@ -2145,7 +2145,7 @@ function calculateFreeModeScore(configSet, timeDifference, debugMode = false) {
             bitrateScore += channelScore;
             
             if (debugMode) {
-                const chName = currentModel.channels[channelIndex]?.name || `CH${channelIndex}`;
+                const chName = (currentModel.channels[channelIndex] && currentModel.channels[channelIndex].name) || `CH${channelIndex}`;
                 console.log(`   📊 ${chName}: ${bitrate}M × weight ${weight} = ${channelScore.toFixed(1)} points`);
             }
         }
@@ -3563,7 +3563,7 @@ function displayResults(results) {
         '</p>' +
         '<p class="text-xs text-gray-600">' +
         '<i class="fas fa-chart-line text-blue-500 mr-1"></i> ' +
-        '<strong>Variação esperada: ±' + (results.variationRange?.margin || 10).toFixed(0) + '%</strong> ' +
+        '<strong>Variação esperada: ±' + (results.variationRange && variationRange.margin || 10).toFixed(0) + '%</strong> ' +
         'devido a fatores como:' +
         '</p>' +
         '<ul class="text-xs text-gray-600 ml-4 space-y-1">' +
@@ -3719,12 +3719,12 @@ function loadSavedState() {
                 unachievableWarning.className = 'mb-4 p-5 rounded-lg border-2 bg-red-50 border-red-400';
                 
                 // Calculate what size would be needed
-                const currentCardSize = parseInt(cardSizeSelect?.value || 64);
+                const currentCardSize = parseInt(cardSizeSelect && cardSizeSelect.value || 64);
                 const neededCardSize = Math.ceil((totalDesiredHours / achievedHours) * currentCardSize);
                 const nextAvailableSize = [32, 64, 128, 256, 512, 1024].find(size => size >= neededCardSize) || neededCardSize;
                 
                 // Calculate how many channels could be disabled
-                const activeChannelCount = currentConfig?.channels?.filter(ch => ch.active).length || 3;
+                const activeChannelCount = (currentConfig && currentConfig.channels && currentConfig.channels.filter(ch => ch.active).length) || 3;
                 const possibleWithLessChannels = activeChannelCount > 1 
                     ? Math.ceil(achievedHours * activeChannelCount / (activeChannelCount - 1))
                     : achievedHours;
@@ -4249,7 +4249,7 @@ function loadSavedState() {
         '</p>' +
         '<p class="text-xs text-gray-600">' +
         '<i class="fas fa-chart-line text-blue-500 mr-1"></i> ' +
-        '<strong>Variação esperada: ±' + (results.variationRange?.margin || 10).toFixed(0) + '%</strong> ' +
+        '<strong>Variação esperada: ±' + (results.variationRange && variationRange.margin || 10).toFixed(0) + '%</strong> ' +
         'devido a fatores como:' +
         '</p>' +
         '<ul class="text-xs text-gray-600 ml-4 space-y-1">' +
