@@ -1,4 +1,4 @@
-﻿// Main Application Logic
+﻿?// Main Application Logic
 let currentModel = null;
 let currentConfig = null;
 let recordingChart = null;

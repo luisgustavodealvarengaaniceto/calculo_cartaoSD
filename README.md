@@ -1,14 +1,14 @@
-# Jimi DVR Recording Calculator
+# Calculadora DVR Jimi IoT - SD Card
 
-🎯 **Calculadora de Tempo de Gravação e Consumo de Dados para DVRs Jimi IoT**
+🎯 **Sistema web para cálculo de tempo de gravação e consumo de dados para dispositivos DVR da Jimi IoT**
 
-Uma ferramenta web moderna e responsiva para calcular o tempo estimado de gravação e consumo de dados dos equipamentos DVR da Jimi IoT (modelos JC181, JC371, JC400 e JC450).
+Uma ferramenta moderna e responsiva para calcular o tempo estimado de gravação e consumo de dados dos equipamentos DVR da Jimi IoT (modelos JC181, JC371, JC400 e JC450).
 
 ## 📋 Características
 
 - ✅ Suporte para 4 modelos de DVR (JC181, JC371, JC400, JC450)
 - ✅ Cálculos baseados no documento oficial Jimi IoT v1.1.5
-- ✅ Interface moderna e responsiva
+- ✅ Interface moderna e responsiva com Tailwind CSS
 - ✅ Modo escuro/claro
 - ✅ Bilíngue (Português/Inglês)
 - ✅ Gráficos interativos com Chart.js
@@ -16,25 +16,133 @@ Uma ferramenta web moderna e responsiva para calcular o tempo estimado de grava�
 - ✅ Exibição de comandos do dispositivo
 - ✅ Salva configurações localmente
 - ✅ Tabela de referência com valores oficiais
+- ✅ Deploy via Docker com proxy reverso Nginx
 
-## 🚀 Como Usar
+## 🚀 Deploy Rápido com Docker
 
-### Opção 1: Abrir diretamente no navegador
+### Pré-requisitos
+- Docker e Docker Compose instalados
+- Porta 8084 disponível
 
-1. Abra o arquivo `index.html` em qualquer navegador moderno (Chrome, Firefox, Edge, Safari)
-2. Não requer servidor web - funciona localmente!
-
-### Opção 2: Usando um servidor local (opcional)
+### Comandos Rápidos
 
 ```bash
-# Python 3
-python -m http.server 8000
+# Build e iniciar
+docker-compose up -d
 
-# Node.js (com http-server)
-npx http-server -p 8000
+# Ver logs
+docker-compose logs -f
+
+# Parar
+docker-compose down
+
+# Reiniciar
+docker-compose restart
 ```
 
-Depois acesse: `http://localhost:8000`
+### Usando o script de deploy (Linux/Mac)
+
+```bash
+# Dar permissão de execução
+chmod +x deploy.sh
+
+# Build da imagem
+./deploy.sh build
+
+# Iniciar aplicação
+./deploy.sh start
+
+# Ver status
+./deploy.sh status
+
+# Ver logs
+./deploy.sh logs
+
+# Atualizar aplicação
+./deploy.sh update
+```
+
+## 🔧 Configuração com Proxy Reverso (Nginx)
+
+A aplicação roda internamente na porta **8084** e deve ser exposta via Nginx.
+
+### Arquivo de configuração do Nginx
+
+Criar arquivo `/etc/nginx/sites-available/calcularsd.jimibrasil.com.br`:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name calcularsd.jimibrasil.com.br;
+
+    access_log /var/log/nginx/calcular-sd-access.log;
+    error_log /var/log/nginx/calcular-sd-error.log;
+
+    client_max_body_size 10M;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        proxy_pass http://localhost:8084;
+        proxy_http_version 1.1;
+        
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $server_name;
+        
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_buffering off;
+    }
+}
+```
+
+### Ativar o site
+
+```bash
+sudo ln -s /etc/nginx/sites-available/calcularsd.jimibrasil.com.br /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Configurar SSL (Opcional)
+
+```bash
+sudo certbot --nginx -d calcularsd.jimibrasil.com.br
+```
+
+## 📁 Estrutura do Projeto
+
+```
+calculo_cartaoSD/
+├── index.html          # Página principal
+├── app.js             # Lógica da aplicação
+├── calculator.js      # Motor de cálculos
+├── models.js          # Modelos de dispositivos DVR
+├── translations.js    # Traduções i18n
+├── styles.css         # Estilos customizados
+├── Dockerfile         # Imagem Docker
+├── docker-compose.yml # Orquestração Docker
+├── nginx.conf         # Configuração Nginx interna
+├── deploy.sh          # Script auxiliar de deploy
+└── DEPLOY.md          # Guia completo de deploy
+```
+
+## 🌐 Acesso
+
+Após o deploy:
+- **Local**: http://localhost:8084
+- **Produção**: http://calcularsd.jimibrasil.com.br
+- **HTTPS** (se configurado): https://calcularsd.jimibrasil.com.br
 
 ## 📊 Modelos Suportados
 
@@ -171,20 +279,50 @@ Clique em "Calcular" para ver:
 - 💾 **Auto-save**: Configurações salvas automaticamente
 - 📱 **Responsivo**: Funciona em desktop, tablet e mobile
 
-## 📖 Validação
+## � Troubleshooting
 
-Os resultados são validados contra a tabela oficial do documento "DVR Products Recording Time Estimation and Data Consumption V1.1.5":
+### Verificar se o container está rodando
+```bash
+docker ps | grep calculo-sd
+```
 
-### JC181
-| Configuração | Cartão | Tempo Est. |
-|-------------|--------|------------|
-| 720P@4M + 360P@0.5M | 64GB | ~29.1h |
-| 720P@4M + 360P@0.5M | 128GB | ~58.3h |
-| 1080P@8M + 360P@0.5M | 64GB | ~15.4h |
-| 480P@1M + 360P@0.5M | 64GB | ~87.4h |
+### Ver logs do container
+```bash
+docker logs -f calculo-sd
+```
 
-### JC371
-| Configuração | Cartão | Tempo Est. |
+### Testar conectividade local
+```bash
+curl http://localhost:8084
+```
+
+### Verificar configuração do Nginx
+```bash
+sudo nginx -t
+sudo systemctl status nginx
+```
+
+### Reiniciar tudo
+```bash
+docker-compose down
+docker-compose up -d --build
+```
+
+## 📝 Documentação Adicional
+
+- [DEPLOY.md](DEPLOY.md) - Guia completo de deploy
+- [CHANGELOG.md](CHANGELOG.md) - Histórico de versões
+- [COMANDOS.md](COMANDOS.md) - Comandos dos equipamentos
+- [FORMULAS_TECNICAS.md](FORMULAS_TECNICAS.md) - Fórmulas e cálculos técnicos
+
+## �📖 Validação
+
+Os resultados são validados contra a tabela oficial do documento "DVR Products Recording Time Estimation and Data Consumption V1.1.5".
+
+## 📄 Licença
+
+Copyright © 2025 Jimi IoT Brasil - Newtec Telemetria
+
 |-------------|--------|------------|
 | 1080P@8M + 720P@4M×2 | 32GB | ~4.1h |
 | 1080P@8M + 720P@4M×2 | 128GB | ~16.4h |

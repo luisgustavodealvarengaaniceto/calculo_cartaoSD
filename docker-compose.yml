@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  calculo-sd:
+    build: .
+    container_name: calculo-sd
+    ports:
+      - "8084:8084"
+    restart: unless-stopped
+    environment:
+      - TZ=America/Sao_Paulo
+    labels:
+      - "com.docker.compose.project=calculo-cartaosd"
+    networks:
+      - calcular-sd-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8084/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  calcular-sd-network:
+    driver: bridge
