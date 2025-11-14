@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Validação de Sintaxe</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .pass { border-left: 4px solid #22c55e; }
+        .fail { border-left: 4px solid #ef4444; }
+        .status { font-weight: bold; margin-right: 10px; }
+        .pass .status { color: #22c55e; }
+        .fail .status { color: #ef4444; }
+        pre {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Validação de Sintaxe - app.js</h1>
+    <p>Testando se o arquivo app.js possui erros de sintaxe...</p>
+    
+    <div id="results"></div>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function addTest(name, passed, message) {
+            const div = document.createElement('div');
+            div.className = `test ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `
+                <span class="status">${passed ? '✅ PASS' : '❌ FAIL'}</span>
+                <strong>${name}</strong>
+                ${message ? `<pre>${message}</pre>` : ''}
+            `;
+            results.appendChild(div);
+        }
+        
+        // Teste 1: Carregar app.js
+        let scriptLoaded = false;
+        let scriptError = null;
+        
+        const script = document.createElement('script');
+        script.src = 'app.js';
+        script.onload = () => {
+            scriptLoaded = true;
+            addTest('Carregamento do app.js', true, 'Script carregado sem erros de sintaxe');
+            runTests();
+        };
+        script.onerror = (e) => {
+            scriptError = e;
+            addTest('Carregamento do app.js', false, `Erro ao carregar: ${e.message || 'Erro desconhecido'}`);
+            runTests();
+        };
+        
+        window.addEventListener('error', (e) => {
+            if (e.filename && e.filename.includes('app.js')) {
+                addTest('Erro de Sintaxe Detectado', false, 
+                    `Linha ${e.lineno}, Coluna ${e.colno}: ${e.message}`);
+            }
+        });
+        
+        document.head.appendChild(script);
+        
+        function runTests() {
+            // Teste 2: Verificar se não há optional chaining
+            fetch('app.js')
+                .then(r => r.text())
+                .then(content => {
+                    const hasOptionalChaining = content.includes('?.');
+                    addTest(
+                        'Optional Chaining Removido',
+                        !hasOptionalChaining,
+                        hasOptionalChaining ? 
+                            'ATENÇÃO: Ainda existem operadores ?. no código!' :
+                            'Nenhum operador ?. encontrado'
+                    );
+                    
+                    // Teste 3: Verificar primeira linha
+                    const firstLine = content.split('\n')[0];
+                    const startsCorrectly = firstLine.trim().startsWith('//');
+                    addTest(
+                        'Primeira Linha Correta',
+                        startsCorrectly,
+                        `Primeira linha: "${firstLine.substring(0, 50)}..."`
+                    );
+                    
+                    // Resumo final
+                    setTimeout(() => {
+                        const allTests = document.querySelectorAll('.test');
+                        const passed = document.querySelectorAll('.test.pass').length;
+                        const failed = document.querySelectorAll('.test.fail').length;
+                        
+                        const summary = document.createElement('div');
+                        summary.className = `test ${failed === 0 ? 'pass' : 'fail'}`;
+                        summary.innerHTML = `
+                            <h2>📊 Resumo</h2>
+                            <p><strong>${passed}</strong> testes passaram</p>
+                            <p><strong>${failed}</strong> testes falharam</p>
+                            ${failed === 0 ? 
+                                '<p>✅ <strong>Tudo OK! Pode fazer commit e push.</strong></p>' :
+                                '<p>❌ <strong>Corrija os erros antes de fazer deploy.</strong></p>'
+                            }
+                        `;
+                        results.appendChild(summary);
+                    }, 500);
+                })
+                .catch(err => {
+                    addTest('Leitura do app.js', false, `Erro: ${err.message}`);
+                });
+        }
+    </script>
+</body>
+</html>

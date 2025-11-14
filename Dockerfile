@@ -9,6 +9,7 @@ RUN rm -rf ./*
 
 # Copy application files
 COPY index.html .
+COPY favicon.svg .
 COPY app.js .
 COPY calculator.js .
 COPY models.js .
