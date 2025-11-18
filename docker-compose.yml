@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  jimi-calculator:
+    build: .
+    container_name: jimi-calculator
+    ports:
+      - "8084:8080"
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - jimi-network
+
+networks:
+  jimi-network:
+    driver: bridge
