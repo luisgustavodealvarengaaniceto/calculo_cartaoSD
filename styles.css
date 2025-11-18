@@ -1,4 +1,8 @@
-﻿/* Custom Styles - Jimi IoT Theme */
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Styles - Jimi IoT Theme */
 :root {
     --jimi-blue-primary: #0066CC;
     --jimi-blue-secondary: #0052A3;
