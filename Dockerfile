@@ -20,7 +20,7 @@ RUN mkdir -p dist
 RUN npm run build:css
 
 # Verify the file was created
-RUN ls -la dist/
+RUN ls -la dist/ && cat dist/output.css | head -5
 
 # Final stage - Use lightweight http-server
 FROM node:18-alpine
@@ -30,21 +30,16 @@ WORKDIR /app
 # Install http-server globally
 RUN npm install -g http-server
 
-# Create dist directory in final image
-RUN mkdir -p dist
-
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
+# Copy built files from builder - INCLUDING dist folder with the CSS file
+COPY --from=builder /app/dist/ ./dist/
 COPY --from=builder /app/*.html ./
 COPY --from=builder /app/*.js ./
+COPY --from=builder /app/*.css ./
 COPY --from=builder /app/*.json ./
 COPY --from=builder /app/*.md ./
 
-# Copy other assets
-COPY --from=builder /app/styles.css ./
-
-# Verify files exist
-RUN ls -la dist/ && ls -la *.html
+# Verify files copied correctly
+RUN echo "=== Checking dist folder ===" && ls -la dist/ && echo "=== Checking CSS file ===" && head -5 dist/output.css
 
 # Expose port 8080
 EXPOSE 8080
