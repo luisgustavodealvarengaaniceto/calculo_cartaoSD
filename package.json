@@ -17,7 +17,7 @@
   ],
   "author": "Jimi Brasil",
   "license": "MIT",
-  "devDependencies": {
+  "dependencies": {
     "tailwindcss": "^3.4.1"
   }
 }
