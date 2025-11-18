@@ -13,8 +13,14 @@ RUN npm install
 # Copy source files
 COPY . .
 
+# Create dist directory
+RUN mkdir -p dist
+
 # Build CSS with Tailwind
 RUN npm run build:css
+
+# Verify the file was created
+RUN ls -la dist/
 
 # Final stage - Use lightweight http-server
 FROM node:18-alpine
@@ -23,6 +29,9 @@ WORKDIR /app
 
 # Install http-server globally
 RUN npm install -g http-server
+
+# Create dist directory in final image
+RUN mkdir -p dist
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
@@ -33,6 +42,9 @@ COPY --from=builder /app/*.md ./
 
 # Copy other assets
 COPY --from=builder /app/styles.css ./
+
+# Verify files exist
+RUN ls -la dist/ && ls -la *.html
 
 # Expose port 8080
 EXPOSE 8080
