@@ -9,7 +9,7 @@ COPY . .
 RUN npm install -g http-server
 
 # Verify dist folder exists
-RUN ls -la dist/ && head -5 dist/output.css
+RUN ls -la dist/ && wc -c dist/output.css
 
 # Expose port 8080
 EXPOSE 8080
