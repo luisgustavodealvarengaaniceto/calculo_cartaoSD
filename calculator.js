@@ -285,9 +285,21 @@ class DVRCalculator {
                 // Get realistic correction factor
                 const correction = this.getRealisticCorrectionFactor(codec, baseCodecMultiplier);
                 correctionFactors.push(correction);
-                
-                // Apply realistic correction factor
-                const effectiveBitrate = channel.bitrate * correction.factor;
+
+                // Calculate resolution and FPS influence (FPS is treated as a critical variable)
+                const resStr = String(channel.resolution || '').replace(/[^0-9]/g, '');
+                let resolutionFactor = 1;
+                if (resStr === '1080') resolutionFactor = 1.0;
+                else if (resStr === '720') resolutionFactor = 0.5;
+                else if (resStr === '480') resolutionFactor = 0.25;
+                else if (resStr === '360') resolutionFactor = 0.125;
+
+                const baselineFPS = 25; // baseline for relative FPS impact
+                const fpsVal = Number(channel.fps) || baselineFPS;
+                const fpsFactor = Math.max(0.1, fpsVal / baselineFPS);
+
+                // Apply realistic correction factor + resolution + fps influence
+                const effectiveBitrate = channel.bitrate * correction.factor * resolutionFactor * fpsFactor;
                 const rateMBh = effectiveBitrate * this.config.MB_PER_HOUR_PER_MBPS;
                 const timeHours = availableSpaceMB / rateMBh;
                 
@@ -300,6 +312,8 @@ class DVRCalculator {
                     codec: codec,
                     codecMultiplier: baseCodecMultiplier,
                     correctionFactor: correction.factor,
+                    resolutionFactor: resolutionFactor,
+                    fpsFactor: fpsFactor,
                     correctionBreakdown: correction.breakdown,
                     effectiveBitrate: effectiveBitrate,
                     timeHours: timeHours,

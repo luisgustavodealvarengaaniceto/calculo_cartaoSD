@@ -3559,7 +3559,6 @@ function displayResults(results) {
         '<div class="text-sm text-gray-700 space-y-2">' +
         '<p>' +
         '<strong>✅ Este resultado é uma estimativa aprimorada</strong>, ajustada com base em <strong>testes reais de gravação</strong> ' +
-        '(como arquivos .TS da JC400 em 1080P@8Mbps@25fps).' +
         '</p>' +
         '<p class="text-xs text-gray-600">' +
         '<i class="fas fa-chart-line text-blue-500 mr-1"></i> ' +
@@ -4245,7 +4244,6 @@ function loadSavedState() {
         '<div class="text-sm text-gray-700 space-y-2">' +
         '<p>' +
         '<strong>✅ Este resultado é uma estimativa aprimorada</strong>, ajustada com base em <strong>testes reais de gravação</strong> ' +
-        '(como arquivos .TS da JC400 em 1080P@8Mbps@25fps).' +
         '</p>' +
         '<p class="text-xs text-gray-600">' +
         '<i class="fas fa-chart-line text-blue-500 mr-1"></i> ' +
